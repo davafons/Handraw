@@ -6,74 +6,116 @@
 
 // Function declaration
 void open_camera(cv::VideoCapture &cap);
+void correct_median_size(int, void *userdata);
 void handle_input(int c);
-
 
 // Global variables
 const int MAX_EMPTY_FRAMES_TO_READ = 2000;
 
 bool quit = false;
 
-
-
+cv::VideoCapture cap;
+MyBGSubtractorColor bg_sub;
 
 int main() {
-  cv::VideoCapture cap;
 
-  const std::string reconocimiento = "Reconocimiento";
-  cv::namedWindow(reconocimiento);
-
+  // 1º - Open camera
   try {
     open_camera(cap);
-
-    MyBGSubtractorColor bg_sub;
-    bg_sub.LearnModel(cap);
-
-    // MAIN LOOP
-    while (!quit) {
-      cv::Mat frame;
-      cap >> frame;
-      cv::flip(frame, frame, 1);
-
-      imshow(reconocimiento, frame);
-
-      handle_input(cv::waitKey(40));
-    }
-
   } catch (const std::runtime_error &e) {
     std::cerr << "ERROR::" << e.what() << std::endl;
+    return EXIT_FAILURE;
+  }
+
+  // 2º - Learn Model using samples from camera
+  bg_sub.LearnModel(cap);
+
+  const std::string reconocimiento = "Reconocimiento";
+  const std::string fondo = "Fondo";
+  cv::namedWindow(reconocimiento);
+  cv::namedWindow(fondo);
+
+  int dilation_size = 2;
+  cv::createTrackbar("Dilation size:", fondo, &dilation_size, 40, nullptr);
+
+  int median_size = 5;
+  cv::createTrackbar("Median size:", fondo, &median_size, 40,
+                     correct_median_size, &median_size);
+
+  cv::Ptr<cv::BackgroundSubtractorMOG2> bg = cv::createBackgroundSubtractorMOG2();
+  bg->setNMixtures(3);
+  bg->setDetectShadows(false);
+
+  int backgroundFrame = 500;
+
+  cv::Mat bgmask;
+
+  // MAIN LOOP
+  while (!quit) {
+    handle_input(cv::waitKey(40));
+
+    cv::Mat frame;
+    cap >> frame;
+    /* cv::flip(frame, frame, 1); */
+
+    if(backgroundFrame > 0) {
+      bg->apply(frame, bgmask);
+      --backgroundFrame;
+    } else {
+      bg->apply(frame, bgmask, 0);
+    }
+
+    // 3º - Background subtraction
+    bg_sub.ObtainBGMask(frame, bgmask);
+
+    // 4º - Noise reduction
+    cv::Mat element = cv::getStructuringElement(
+        cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
+
+    cv::medianBlur(bgmask, bgmask, median_size);
+    cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
+    cv::dilate(bgmask, bgmask, cv::Mat(), cv::Point(-1, -1), 3);
+
+    cv::imshow(reconocimiento, frame);
+    cv::imshow(fondo, bgmask);
   }
 
   cv::destroyWindow(reconocimiento);
+  cv::destroyWindow(fondo);
   cap.release();
 
-  return 0;
+  return EXIT_SUCCESS;
 }
-
 
 void open_camera(cv::VideoCapture &cap) {
   if (!cap.open(0))
     throw std::runtime_error("No se pudo abrir la cámara!");
 
   cv::Mat frame;
-
   int cont = 0;
   while (frame.empty() && ++cont < 2000)
     cap >> frame;
 
-  if(cont >= MAX_EMPTY_FRAMES_TO_READ)
-    throw std::runtime_error("No se ha podido leer un frame valido tras iniciar la cámara!");
+  if (cont >= MAX_EMPTY_FRAMES_TO_READ)
+    throw std::runtime_error(
+        "No se ha podido leer un frame valido tras iniciar la cámara!");
 }
 
+void correct_median_size(int, void *userdata) {
+  int &median_size = *reinterpret_cast<int *>(userdata);
+  if (median_size % 2 == 0)
+    ++median_size;
+}
 
 void handle_input(int c) {
-  switch(c) {
-    case 27: // Escape key
-    case 'q':
-      quit = true;
-      break;
+  switch (c) {
+  case 27: // Escape key
+  case 'q':
+    quit = true;
+    break;
 
-
+  case 'r':
+    bg_sub.LearnModel(cap);
+    break;
   }
 }
-
