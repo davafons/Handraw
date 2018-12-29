@@ -29,61 +29,59 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
   std::vector<std::vector<cv::Point>> contours;
   cv::Mat temp_mask;
   mask.copyTo(temp_mask);
-  int index = -1;
 
   // CODIGO 3.1
-  // detección del contorno de la mano y selección del contorno más largo
-  findContours(temp_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+  // Detección del contorno de la mano y selección del contorno más largo
+  cv::findContours(temp_mask, contours, cv::RETR_EXTERNAL,
+                   cv::CHAIN_APPROX_SIMPLE);
 
-  int mmax_size = 0;
-  for (int i = 0; i < contours.size(); ++i) {
-    if (contours[i].size() >= mmax_size) {
-      mmax_size = contours[i].size();
-      index = i;
-    }
-  }
+  auto max_contour_iter =
+      std::max_element(contours.cbegin(), contours.cend(),
+                       [](std::vector<cv::Point> i, std::vector<cv::Point> j) {
+                         return i.size() < j.size();
+                       });
 
-  // pintar el contorno
-  drawContours(output_img, contours, index, cv::Scalar(255, 0, 0), 2, 8,
-               std::vector<cv::Vec4i>(), 0, cv::Point());
+  int max_contour_index = max_contour_iter - contours.cbegin();
+  auto max_contour = *max_contour_iter;
 
-  // obtener el convex hull
-  std::vector<int> hull;
-  convexHull(contours[index], hull);
+  // Pintar el contorno
+  cv::drawContours(output_img, contours, max_contour_index,
+                   cv::Scalar(255, 0, 0), 2);
 
-  // pintar el convex hull
-  cv::Point pt0 = contours[index][hull[hull.size() - 1]];
-  for (int i = 0; i < hull.size(); i++) {
-    cv::Point pt = contours[index][hull[i]];
-    line(output_img, pt0, pt, cv::Scalar(0, 0, 255), 2, cv::LINE_AA);
-    pt0 = pt;
-  }
+  // Obtenemos el convex hull
+  std::vector<cv::Point> hull_points; // Para dibujar
+  cv::convexHull(max_contour, hull_points);
 
-  // obtener los defectos de convexidad
+  std::vector<int> hull_ints; // Para calcular los defectos de convexidad
+  cv::convexHull(max_contour, hull_ints);
+
+  // Pintamos el convex hull
+  cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
+
+  // Obtenemos los defectos de convexidad
   std::vector<cv::Vec4i> defects;
-  convexityDefects(contours[index], hull, defects);
+  cv::convexityDefects(max_contour, hull_ints, defects);
 
-  int cont = 0;
-  for (int i = 0; i < defects.size(); i++) {
-    cv::Point s = contours[index][defects[i][0]];
-    cv::Point e = contours[index][defects[i][1]];
-    cv::Point f = contours[index][defects[i][2]];
-    float depth = (float)defects[i][3] / 256.0;
+  cv::createTrackbar("Max angle", "Reconocimiento", &max_angle_, 180);
+
+
+  for(int i = 0; i < defects.size(); ++i) {
+    const cv::Vec4i& defect = defects[i];
+
+    cv::Point s = max_contour[defect[0]];
+    cv::Point e = max_contour[defect[1]];
+    cv::Point f = max_contour[defect[2]];
+
+    float depth = float(defect[3]) / 256.0;
     double angle = getAngle(s, e, f);
 
     // CODIGO 3.2
-    // filtrar y mostrar los defectos de convexidad
-    //...
-    /* if(angle < 10.0f || angle > 100.0f) */
-    /*   continue; */
-
-    if (depth < 80)
+    // Filtrar y mostrar los defectos de convexidad
+    if(angle > max_angle_)
       continue;
 
-    ++cont;
-    circle(output_img, f, 5, cv::Scalar(0, 255, 0), 3);
+    cv::circle(output_img, hull_points[i], 5, cv::Scalar(0, 255, 255), 3);
+    /* cv::circle(output_img, s, 5, cv::Scalar(255, 0, 0), 3); */
+    /* cv::circle(output_img, e, 5, cv::Scalar(255, 255, 0), 3); */
   }
-
-  putText(output_img, std::to_string(cont), cv::Point(130, 130),
-          cv::FONT_HERSHEY_COMPLEX_SMALL, 4, cv::Scalar(255, 50, 50), 1, cv::LINE_AA);
 }
