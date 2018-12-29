@@ -4,6 +4,9 @@
 
 #include "MyBGSubtractorColor.h"
 
+#define CVUI_IMPLEMENTATION
+#include "cvui.h"
+
 // Function declaration
 void open_camera(cv::VideoCapture &cap);
 void correct_median_size(int, void *userdata);
@@ -58,9 +61,9 @@ int main() {
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
 
-    cv::medianBlur(bgmask, bgmask, median_size);
     cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
-    cv::dilate(bgmask, bgmask, cv::Mat(), cv::Point(-1, -1), 3);
+    cv::medianBlur(bgmask, bgmask, median_size);
+    /* cv::dilate(bgmask, bgmask, cv::Mat(), cv::Point(-1, -1), 3); */
 
     // Show windows
     cv::flip(frame, frame, 1);
