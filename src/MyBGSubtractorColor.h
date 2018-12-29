@@ -1,3 +1,6 @@
+#pragma once
+
+#include <istream>
 #include <string>
 #include <vector>
 
@@ -9,7 +12,8 @@ public:
   ~MyBGSubtractorColor();
 
   void LearnModel(cv::VideoCapture &cap);
-  void ObtainBGMask(cv::Mat frame, cv::Mat &bgmask);
+  void LearnModel(std::istream &means_file);
+  void ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const;
 
 private:
   int h_low_{61}, h_up_{22};
@@ -21,14 +25,12 @@ private:
   const int max_samples_{max_horiz_samples_ * max_vert_samples_};
 
   int distance_between_samples_{30};
-  int sample_size_{30};
+  int sample_size_{20};
 
   std::vector<cv::Scalar> means_;
 
   const std::string win_trackbars_{"Trackbars"};
 
-  int temp_frame_number{0};
-
 private:
-  void clamp(cv::Scalar &s, int low = 0, int up = 255);
+  void clamp(cv::Scalar &s, int low = 0, int up = 255) const;
 };

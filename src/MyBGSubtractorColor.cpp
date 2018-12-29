@@ -1,7 +1,8 @@
 #include "MyBGSubtractorColor.h"
 
 MyBGSubtractorColor::MyBGSubtractorColor() {
-  cv::namedWindow(win_trackbars_);
+  cv::namedWindow(win_trackbars_, cv::WINDOW_GUI_EXPANDED);
+  cv::moveWindow(win_trackbars_, 1400, 50);
 
   cv::createTrackbar("H low:", win_trackbars_, &h_low_, 100);
   cv::createTrackbar("H up:", win_trackbars_, &h_up_, 100);
@@ -9,8 +10,6 @@ MyBGSubtractorColor::MyBGSubtractorColor() {
   cv::createTrackbar("L up:", win_trackbars_, &l_up_, 100);
   cv::createTrackbar("S low:", win_trackbars_, &s_low_, 100);
   cv::createTrackbar("S up:", win_trackbars_, &s_up_, 100);
-  cv::createTrackbar("Temp frame number:", win_trackbars_,
-                     &temp_frame_number, max_samples_ - 1);
 }
 
 MyBGSubtractorColor::~MyBGSubtractorColor() {
@@ -73,22 +72,35 @@ void MyBGSubtractorColor::LearnModel(cv::VideoCapture &cap) {
   cv::Mat hls_frame;
   cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
+  means_.clear();
   for (const auto &sample : samples_positions) {
     cv::Mat roi =
         hls_frame(cv::Rect(sample.x, sample.y, sample_size_, sample_size_));
     means_.push_back(cv::mean(roi));
+    std::cout << cv::mean(roi) << std::endl;
   }
 }
 
-void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) {
+void MyBGSubtractorColor::LearnModel(std::istream &means_file) {
+  while (means_file) {
+    cv::Scalar mean;
+    means_file >> mean[0] >> mean[1] >> mean[2] >> mean[3];
+
+    if(means_file.eof())
+      break;
+    means_.push_back(mean);
+  }
+
+  std::cout << means_.size() << std::endl;
+}
+
+void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
   cv::Mat acc = cv::Mat::zeros(frame.size(), CV_8U);
 
   cv::Mat hls_frame;
   cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
-  for (size_t i = 0; i < means_.size(); ++i) {
-    cv::Scalar mean = means_[i];
-
+  for (const auto &mean : means_) {
     cv::Scalar low_bound(mean[0] - h_low_, mean[1] - s_low_, mean[2] - l_low_);
     cv::Scalar up_bound(mean[0] + h_up_, mean[1] + s_up_, +mean[2] + l_up_);
 
@@ -98,18 +110,12 @@ void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) {
     cv::Mat temp_bgmask;
     cv::inRange(hls_frame, low_bound, up_bound, temp_bgmask);
     acc += temp_bgmask;
-
-    // For debugging, show temp masks
-    if (i == temp_frame_number) {
-      cv::flip(temp_bgmask, temp_bgmask, 1);
-      cv::imshow(win_trackbars_, temp_bgmask);
-    }
   }
 
   acc.copyTo(bgmask);
 }
 
-void MyBGSubtractorColor::clamp(cv::Scalar &s, int low, int up) {
+void MyBGSubtractorColor::clamp(cv::Scalar &s, int low, int up) const {
   s[0] = (s[0] < low) ? low : (s[0] > up) ? up : s[0];
   s[1] = (s[1] < low) ? low : (s[1] > up) ? up : s[1];
   s[2] = (s[2] < low) ? low : (s[2] > up) ? up : s[2];
