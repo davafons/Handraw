@@ -30,6 +30,7 @@ int main() {
   // 2º - Learn Model using samples from camera
   bg_sub.LearnModel(cap);
 
+  // 3º - Create windows
   const std::string reconocimiento = "Reconocimiento";
   const std::string fondo = "Fondo";
   cv::namedWindow(reconocimiento);
@@ -42,33 +43,18 @@ int main() {
   cv::createTrackbar("Median size:", fondo, &median_size, 40,
                      correct_median_size, &median_size);
 
-  cv::Ptr<cv::BackgroundSubtractorMOG2> bg = cv::createBackgroundSubtractorMOG2();
-  bg->setNMixtures(3);
-  bg->setDetectShadows(false);
-
-  int backgroundFrame = 500;
-
-  cv::Mat bgmask;
-
   // MAIN LOOP
   while (!quit) {
     handle_input(cv::waitKey(40));
 
     cv::Mat frame;
     cap >> frame;
-    /* cv::flip(frame, frame, 1); */
 
-    if(backgroundFrame > 0) {
-      bg->apply(frame, bgmask);
-      --backgroundFrame;
-    } else {
-      bg->apply(frame, bgmask, 0);
-    }
-
-    // 3º - Background subtraction
+    // 4º - Background subtraction
+    cv::Mat bgmask;
     bg_sub.ObtainBGMask(frame, bgmask);
 
-    // 4º - Noise reduction
+    // 5º - Noise reduction
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
 
@@ -76,6 +62,8 @@ int main() {
     cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
     cv::dilate(bgmask, bgmask, cv::Mat(), cv::Point(-1, -1), 3);
 
+    // Show windows
+    cv::flip(frame, frame, 1);
     cv::imshow(reconocimiento, frame);
     cv::imshow(fondo, bgmask);
   }
