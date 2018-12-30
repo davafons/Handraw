@@ -31,7 +31,9 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  // 2º - Learn Model using samples from camera or file
+  bg_sub.LearnBGModel(cap);
+
+  // 2º - Learn Skin Model using samples from camera or file
   if (argc >= 2) {
     std::ifstream means_file;
     try {
@@ -54,10 +56,10 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(fondo);
   cv::moveWindow(fondo, 750, 50);
 
-  int dilation_size = 2;
+  int dilation_size = 3;
   cv::createTrackbar("Dilation size:", fondo, &dilation_size, 40, nullptr);
 
-  int median_size = 5;
+  int median_size = 9;
   cv::createTrackbar("Median size:", fondo, &median_size, 40,
                      correct_median_size, &median_size);
 
@@ -79,8 +81,9 @@ int main(int argc, char *argv[]) {
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
 
-    cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
     cv::medianBlur(bgmask, bgmask, median_size);
+    cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
+    /* cv::dilate(bgmask, bgmask, element); */
 
     // 6º - Features detection
     hand_detector.FeaturesDetection(bgmask, frame);
@@ -131,6 +134,14 @@ void handle_input(int c) {
 
   case 'r': // Relearn samples
     bg_sub.LearnModel(cap);
+    break;
+
+  case 'b': // Relearn background
+    bg_sub.LearnBGModel(cap);
+    break;
+
+  case 't':
+    bg_sub.ToggleBGMask();
     break;
   }
 }

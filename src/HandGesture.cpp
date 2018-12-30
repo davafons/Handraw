@@ -35,6 +35,11 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
   cv::findContours(temp_mask, contours, cv::RETR_EXTERNAL,
                    cv::CHAIN_APPROX_SIMPLE);
 
+  if(contours.empty()) {
+    std::cerr << "No contour detected!\n";
+    return;
+  }
+
   auto max_contour_iter =
       std::max_element(contours.cbegin(), contours.cend(),
                        [](std::vector<cv::Point> i, std::vector<cv::Point> j) {
@@ -80,7 +85,7 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
     if(angle > max_angle_)
       continue;
 
-    cv::circle(output_img, hull_points[i], 5, cv::Scalar(0, 255, 255), 3);
+    cv::circle(output_img, f, 5, cv::Scalar(0, 255, 255), 3);
     /* cv::circle(output_img, s, 5, cv::Scalar(255, 0, 0), 3); */
     /* cv::circle(output_img, e, 5, cv::Scalar(255, 255, 0), 3); */
   }

@@ -3,6 +3,11 @@
 MyBGSubtractorColor::MyBGSubtractorColor() {
   cv::namedWindow(win_trackbars_, cv::WINDOW_GUI_EXPANDED);
   cv::moveWindow(win_trackbars_, 1400, 50);
+  cv::namedWindow("test");
+
+  cv::namedWindow("bg");
+
+  bg_subtractor_ = cv::createBackgroundSubtractorMOG2(500, 7, false);
 
   cv::createTrackbar("H low:", win_trackbars_, &h_low_, 100);
   cv::createTrackbar("H up:", win_trackbars_, &h_up_, 100);
@@ -30,10 +35,9 @@ void MyBGSubtractorColor::LearnModel(cv::VideoCapture &cap) {
   cv::createTrackbar("Max vert samples", window_samples, &max_vert_samples_, 10,
                      nullptr);
 
-  cv::Mat frame;
-
   std::vector<cv::Point> samples_positions;
 
+  cv::Mat frame;
   while (true) {
     cap >> frame;
 
@@ -86,7 +90,7 @@ void MyBGSubtractorColor::LearnModel(std::istream &means_file) {
     cv::Scalar mean;
     means_file >> mean[0] >> mean[1] >> mean[2] >> mean[3];
 
-    if(means_file.eof())
+    if (means_file.eof())
       break;
     means_.push_back(mean);
   }
@@ -94,11 +98,49 @@ void MyBGSubtractorColor::LearnModel(std::istream &means_file) {
   std::cout << means_.size() << std::endl;
 }
 
-void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
-  cv::Mat acc = cv::Mat::zeros(frame.size(), CV_8U);
+void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
+  cv::Mat frame;
+  cv::Mat temp;
 
+  while (frame.empty())
+    cap >> frame;
+
+  // Parameter 1 means to wipe last model and start relearning
   cv::Mat hls_frame;
-  cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
+  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
+  bg_subtractor_->apply(hls_frame, temp, 1);
+
+  for (int i = 0; i < max_bg_samples_; ++i) {
+    cap >> frame;
+    if (frame.empty())
+      continue;
+
+    cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
+    bg_subtractor_->apply(hls_frame, temp);
+  }
+
+  bg_subtractor_->getBackgroundImage(temp);
+  cv::imshow("bg", temp);
+}
+
+void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
+  cv::Mat hls_frame;
+  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
+
+  if(bg_subtractor_enabled_) {
+    // Get foreground mask
+    cv::Mat foreground_mask;
+    bg_subtractor_->apply(hls_frame, foreground_mask, 0);
+
+    // Get a frame masked (without most of the bg)
+    cv::Mat masked_frame;
+    cv::bitwise_and(hls_frame, hls_frame, masked_frame, foreground_mask);
+    hls_frame = masked_frame;
+
+    cv::imshow("test", masked_frame);
+  }
+
+  cv::Mat acc = cv::Mat::zeros(frame.size(), CV_8U);
 
   for (const auto &mean : means_) {
     cv::Scalar low_bound(mean[0] - h_low_, mean[1] - s_low_, mean[2] - l_low_);
