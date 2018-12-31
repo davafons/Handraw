@@ -50,9 +50,9 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
   std::vector<cv::Vec4i> defects;
   cv::convexityDefects(max_contour, hull_ints, defects);
 
-  cv::createTrackbar("Max angle", "Reconocimiento", &max_angle_, 180);
   cv::createTrackbar("Min depth", "Reconocimiento", &min_depth_, 200);
-  cv::createTrackbar("Max depth", "Reconocimiento", &max_depth_, 200);
+  cv::createTrackbar("Min length", "Reconocimiento", &min_length_, 400);
+  cv::createTrackbar("Max length", "Reconocimiento", &max_length_, 400);
   cv::createTrackbar("Max neighbour distance", "Reconocimiento",
                      &max_neighbour_distance, 300);
 
@@ -69,10 +69,7 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
 
     // CODIGO 3.2
     // Filtrar y mostrar los defectos de convexidad
-    if (angle > max_angle_)
-      continue;
-
-    if (depth < min_depth_ || depth > max_depth_)
+    if (depth < min_depth_)
       continue;
 
     cv::circle(output_img, f, 3, cv::Scalar(0, 255, 255), 2);
@@ -80,7 +77,7 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
   }
 
   // Get fingers
-  if (!good_points.empty()) {
+  if (!good_points.empty() && good_points.size() >= 3) {
     cv::Point2f min_center;
     float rad;
     cv::minEnclosingCircle(good_points, min_center, rad);
@@ -89,6 +86,13 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
 
     std::vector<cv::Point> merged_points = mergeNearPoints(hull_points);
     for (const auto &point : merged_points) {
+      if(point.y - 70 > min_center.y)
+        continue;
+
+      float diff = cv::norm(min_center - cv::Point2f(point));
+      if(diff < min_length_ || diff > max_length_)
+        continue;
+
       cv::circle(output_img, point, 2, cv::Scalar(0, 0, 255), 2);
       cv::line(output_img, point, min_center, cv::Scalar(0, 0, 255), 2);
     }
@@ -136,6 +140,8 @@ HandGesture::mergeNearPoints(const std::vector<cv::Point> &points) const {
                            total.y / acc_points.size());
       merged_points.push_back(mean_point);
       acc_points.clear();
+
+      std::cout << current_label << " - " << mean_point << "\n";
       current_label = labels[i];
     }
     acc_points.push_back(points[i]);
@@ -148,9 +154,6 @@ HandGesture::mergeNearPoints(const std::vector<cv::Point> &points) const {
                          total.y / acc_points.size());
     merged_points.push_back(mean_point);
   }
-
-  std::copy(merged_points.cbegin(), merged_points.cend(),
-            std::ostream_iterator<cv::Point>(std::cout, "\n"));
 
   std::cout << "--" << std::endl;
 

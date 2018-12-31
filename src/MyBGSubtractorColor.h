@@ -24,7 +24,7 @@ public:
 private:
   int h_low_{85}, h_up_{4};
   int l_low_{44}, l_up_{68};
-  int s_low_{36}, s_up_{9};
+  int s_low_{36}, s_up_{73};
 
   int max_horiz_samples_{3};
   int max_vert_samples_{6};
