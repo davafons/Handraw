@@ -1,3 +1,6 @@
+#include <algorithm>
+#include <iterator>
+#include <numeric>
 #include <vector>
 
 #include "HandGesture.h"
@@ -51,7 +54,7 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
   cv::createTrackbar("Min depth", "Reconocimiento", &min_depth_, 200);
   cv::createTrackbar("Max depth", "Reconocimiento", &max_depth_, 200);
   cv::createTrackbar("Max neighbour distance", "Reconocimiento",
-                     &max_neighbour_distance, 180);
+                     &max_neighbour_distance, 300);
 
   std::vector<cv::Point> good_points;
   for (int i = 0; i < defects.size(); ++i) {
@@ -76,12 +79,19 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
     good_points.push_back(f);
   }
 
-  if(!good_points.empty()) {
+  // Get fingers
+  if (!good_points.empty()) {
     cv::Point2f min_center;
     float rad;
     cv::minEnclosingCircle(good_points, min_center, rad);
     cv::circle(output_img, min_center, rad, cv::Scalar(0, 255, 0), 2);
     cv::circle(output_img, min_center, 3, cv::Scalar(0, 255, 0), 2);
+
+    std::vector<cv::Point> merged_points = mergeNearPoints(hull_points);
+    for (const auto &point : merged_points) {
+      cv::circle(output_img, point, 2, cv::Scalar(0, 0, 255), 2);
+      cv::line(output_img, point, min_center, cv::Scalar(0, 0, 255), 2);
+    }
   }
 }
 
@@ -111,19 +121,38 @@ std::vector<cv::Point>
 HandGesture::mergeNearPoints(const std::vector<cv::Point> &points) const {
   std::vector<cv::Point> merged_points;
 
-  int count = 0;
-  cv::Point mean_point = points[0];
+  std::vector<int> labels;
+  cv::partition(points, labels, [this](const cv::Point &a, const cv::Point &b) {
+    return cv::norm(a - b) < max_neighbour_distance;
+  });
 
-  for (size_t i = 1; i < points.size(); ++i) {
-    double diff = cv::norm(mean_point - points[i]);
-
-    if (diff > max_neighbour_distance) {
+  int current_label = labels.front();
+  std::vector<cv::Point> acc_points;
+  for (size_t i = 0; i < labels.size(); ++i) {
+    if (current_label != labels[i]) {
+      cv::Point total =
+          std::accumulate(acc_points.cbegin(), acc_points.cend(), cv::Point(0));
+      cv::Point mean_point(total.x / acc_points.size(),
+                           total.y / acc_points.size());
       merged_points.push_back(mean_point);
-      mean_point = points[i];
-    } else {
-      mean_point = (mean_point + points[i]) / 2;
+      acc_points.clear();
+      current_label = labels[i];
     }
+    acc_points.push_back(points[i]);
   }
+
+  if (!acc_points.empty()) {
+    cv::Point total =
+        std::accumulate(acc_points.cbegin(), acc_points.cend(), cv::Point(0));
+    cv::Point mean_point(total.x / acc_points.size(),
+                         total.y / acc_points.size());
+    merged_points.push_back(mean_point);
+  }
+
+  std::copy(merged_points.cbegin(), merged_points.cend(),
+            std::ostream_iterator<cv::Point>(std::cout, "\n"));
+
+  std::cout << "--" << std::endl;
 
   return merged_points;
 }

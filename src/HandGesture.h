@@ -10,8 +10,8 @@ public:
   void FeaturesDetection(cv::Mat mask, cv::Mat output_img);
 
 private:
-  int max_angle_{120};
-  int min_depth_{27};
+  int max_angle_{180};
+  int min_depth_{6};
   int max_depth_{130};
 
   int max_neighbour_distance{40};
