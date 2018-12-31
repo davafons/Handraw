@@ -4,10 +4,9 @@ MyBGSubtractorColor::MyBGSubtractorColor() {
   cv::namedWindow(win_trackbars_, cv::WINDOW_GUI_EXPANDED);
   cv::moveWindow(win_trackbars_, 1400, 50);
   cv::namedWindow("test");
-
   cv::namedWindow("bg");
 
-  bg_subtractor_ = cv::createBackgroundSubtractorMOG2(500, 7, false);
+  bg_subtractor_ = cv::createBackgroundSubtractorMOG2(500, 5, false);
 
   cv::createTrackbar("H low:", win_trackbars_, &h_low_, 100);
   cv::createTrackbar("H up:", win_trackbars_, &h_up_, 100);
@@ -123,22 +122,26 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
   cv::imshow("bg", temp);
 }
 
+void MyBGSubtractorColor::RemoveBG(cv::Mat frame, cv::Mat &masked_frame) const {
+  // Get foreground mask
+  cv::Mat foreground_mask;
+  bg_subtractor_->apply(frame, foreground_mask, 0);
+  cv::medianBlur(foreground_mask, foreground_mask, 3);
+
+  // Get a masked frame (without most of the bg)
+  cv::Mat result;
+  cv::bitwise_and(frame, frame, result, foreground_mask);
+  masked_frame = result;
+
+  cv::imshow("test", masked_frame);
+}
+
 void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
   cv::Mat hls_frame;
   cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
-  if(bg_subtractor_enabled_) {
-    // Get foreground mask
-    cv::Mat foreground_mask;
-    bg_subtractor_->apply(hls_frame, foreground_mask, 0);
-
-    // Get a frame masked (without most of the bg)
-    cv::Mat masked_frame;
-    cv::bitwise_and(hls_frame, hls_frame, masked_frame, foreground_mask);
-    hls_frame = masked_frame;
-
-    cv::imshow("test", masked_frame);
-  }
+  if (bg_subtractor_enabled_)
+    RemoveBG(hls_frame, hls_frame);
 
   cv::Mat acc = cv::Mat::zeros(frame.size(), CV_8U);
 

@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
   int dilation_size = 3;
   cv::createTrackbar("Dilation size:", fondo, &dilation_size, 40, nullptr);
 
-  int median_size = 9;
+  int median_size = 11;
   cv::createTrackbar("Median size:", fondo, &median_size, 40,
                      correct_median_size, &median_size);
 
@@ -83,7 +83,7 @@ int main(int argc, char *argv[]) {
 
     cv::medianBlur(bgmask, bgmask, median_size);
     cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
-    /* cv::dilate(bgmask, bgmask, element); */
+    cv::dilate(bgmask, bgmask, element);
 
     // 6º - Features detection
     hand_detector.FeaturesDetection(bgmask, frame);
