@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
     hand_detector.FeaturesDetection(bgmask, frame);
 
     // 7º - Display results
-    cv::flip(frame, frame, 1);
+    /* cv::flip(frame, frame, 1); */
     cv::imshow(reconocimiento, frame);
     cv::flip(bgmask, bgmask, 1);
     cv::imshow(fondo, bgmask);
@@ -142,6 +142,10 @@ void handle_input(int c) {
 
   case 't':
     bg_sub.ToggleBGMask();
+    break;
+
+  case 'd':
+    hand_detector.ToggleDebugLines();
     break;
   }
 }

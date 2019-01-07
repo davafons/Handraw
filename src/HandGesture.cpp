@@ -33,8 +33,9 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
   auto max_contour = *max_contour_iter;
 
   // Pintar el contorno
-  cv::drawContours(output_img, contours, max_contour_index,
-                   cv::Scalar(255, 0, 0), 2);
+  if (debug_lines_)
+    cv::drawContours(output_img, contours, max_contour_index,
+                     cv::Scalar(255, 0, 0), 2);
 
   // Obtenemos el convex hull
   std::vector<cv::Point> hull_points; // Para dibujar
@@ -44,7 +45,8 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
   cv::convexHull(max_contour, hull_ints);
 
   // Pintamos el convex hull
-  cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
+  if (debug_lines_)
+    cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
 
   // Obtenemos los defectos de convexidad
   std::vector<cv::Vec4i> defects;
@@ -72,31 +74,50 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
     if (depth < min_depth_)
       continue;
 
-    cv::circle(output_img, f, 3, cv::Scalar(0, 255, 255), 2);
+    if (debug_lines_)
+      cv::circle(output_img, f, 3, cv::Scalar(0, 255, 255), 2);
+
     good_points.push_back(f);
   }
 
+
+  int fingers = 0;
   // Get fingers
   if (!good_points.empty() && good_points.size() >= 3) {
     cv::Point2f min_center;
     float rad;
     cv::minEnclosingCircle(good_points, min_center, rad);
-    cv::circle(output_img, min_center, rad, cv::Scalar(0, 255, 0), 2);
-    cv::circle(output_img, min_center, 3, cv::Scalar(0, 255, 0), 2);
+
+    if (debug_lines_) {
+      cv::circle(output_img, min_center, rad, cv::Scalar(0, 255, 0), 2);
+      cv::circle(output_img, min_center, 3, cv::Scalar(0, 255, 0), 2);
+    }
 
     std::vector<cv::Point> merged_points = mergeNearPoints(hull_points);
+
+    // Count fingers
     for (const auto &point : merged_points) {
-      if(point.y - 70 > min_center.y)
+      if (fingers == 5)
+        break;
+
+      if (point.y - 70 > min_center.y)
         continue;
 
       float diff = cv::norm(min_center - cv::Point2f(point));
-      if(diff < min_length_ || diff > max_length_)
+      if (diff < min_length_ || diff > max_length_)
         continue;
 
-      cv::circle(output_img, point, 2, cv::Scalar(0, 0, 255), 2);
-      cv::line(output_img, point, min_center, cv::Scalar(0, 0, 255), 2);
+      ++fingers;
+      if (debug_lines_)
+        cv::line(output_img, point, min_center, cv::Scalar(0, 0, 255), 2);
+
+      cv::circle(output_img, point, 5, cv::Scalar(0, 255, 255), 3);
     }
   }
+
+  cv::flip(output_img, output_img, 1);
+  cv::putText(output_img, std::to_string(fingers), {150, 150},
+              cv::FONT_HERSHEY_PLAIN, 8, cv::Scalar(255, 255, 255), 8);
 }
 
 double HandGesture::getAngle(cv::Point s, cv::Point e, cv::Point f) {
@@ -147,13 +168,14 @@ HandGesture::mergeNearPoints(const std::vector<cv::Point> &points) const {
     acc_points.push_back(points[i]);
   }
 
-  if (!acc_points.empty()) {
-    cv::Point total =
-        std::accumulate(acc_points.cbegin(), acc_points.cend(), cv::Point(0));
-    cv::Point mean_point(total.x / acc_points.size(),
-                         total.y / acc_points.size());
-    merged_points.push_back(mean_point);
-  }
+  /* if (!acc_points.empty()) { */
+  /*   cv::Point total = */
+  /*       std::accumulate(acc_points.cbegin(), acc_points.cend(),
+   * cv::Point(0)); */
+  /*   cv::Point mean_point(total.x / acc_points.size(), */
+  /*                        total.y / acc_points.size()); */
+  /*   merged_points.push_back(mean_point); */
+  /* } */
 
   std::cout << "--" << std::endl;
 
