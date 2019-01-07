@@ -31,9 +31,10 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
+  // 3º - Get an image of the background for BG Subtraction
   bg_sub.LearnBGModel(cap);
 
-  // 2º - Learn Skin Model using samples from camera or file
+  // 3º - Get average color of the skin using samples from camera or file
   if (argc >= 2) {
     std::ifstream means_file;
     try {
@@ -48,7 +49,7 @@ int main(int argc, char *argv[]) {
     bg_sub.LearnModel(cap);
   }
 
-  // 3º - Create windows
+  // 4º - Create windows
   const std::string reconocimiento = "Reconocimiento";
   const std::string fondo = "Fondo";
   cv::namedWindow(reconocimiento);
@@ -73,11 +74,11 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    // 4º - Background subtraction
+    // 5º - Background subtraction
     cv::Mat bgmask;
     bg_sub.ObtainBGMask(frame, bgmask);
 
-    // 5º - Noise reduction
+    // 6º - Noise reduction
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
 
@@ -85,11 +86,17 @@ int main(int argc, char *argv[]) {
     cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
     cv::dilate(bgmask, bgmask, element);
 
-    // 6º - Features detection
+    // 7º - Features detection (fingers)
     hand_detector.FeaturesDetection(bgmask, frame);
 
-    // 7º - Display results
-    /* cv::flip(frame, frame, 1); */
+    // 8º - Display results
+    cv::flip(frame, frame, 1);
+
+    // Write the number of found fingers
+    cv::putText(frame, std::to_string(hand_detector.getFingerCount()),
+                {150, 150}, cv::FONT_HERSHEY_PLAIN, 8,
+                cv::Scalar(255, 255, 255), 8);
+
     cv::imshow(reconocimiento, frame);
     cv::flip(bgmask, bgmask, 1);
     cv::imshow(fondo, bgmask);
@@ -140,11 +147,11 @@ void handle_input(int c) {
     bg_sub.LearnBGModel(cap);
     break;
 
-  case 't':
+  case 't': // Toggle background subtraction
     bg_sub.ToggleBGMask();
     break;
 
-  case 'd':
+  case 'd': // Toggle draw lines to fingers
     hand_detector.ToggleDebugLines();
     break;
   }

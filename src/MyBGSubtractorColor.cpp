@@ -18,6 +18,8 @@ MyBGSubtractorColor::MyBGSubtractorColor() {
 
 MyBGSubtractorColor::~MyBGSubtractorColor() {
   cv::destroyWindow(win_trackbars_);
+  cv::destroyWindow("test");
+  cv::destroyWindow("bg");
 }
 
 void MyBGSubtractorColor::LearnModel(cv::VideoCapture &cap) {
@@ -39,6 +41,11 @@ void MyBGSubtractorColor::LearnModel(cv::VideoCapture &cap) {
   cv::Mat frame;
   while (true) {
     cap >> frame;
+
+    if (frame.empty()) {
+      std::cerr << "Read empty frame." << std::endl;
+      continue;
+    }
 
     cv::Mat tmp_frame;
     frame.copyTo(tmp_frame);
