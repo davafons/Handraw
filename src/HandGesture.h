@@ -34,5 +34,4 @@ private:
   void DetectHandFingers(const std::vector<cv::Point> &contour, cv::Mat output_img);
 
   double getAngle(cv::Point s, cv::Point e, cv::Point f);
-  std::vector<cv::Point> mergeNearPoints(const std::vector<cv::Point> &points) const;
 };
