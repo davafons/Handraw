@@ -64,6 +64,7 @@ int main(int argc, char *argv[]) {
   cv::createTrackbar("Median size:", fondo, &median_size, 40,
                      correct_median_size, &median_size);
 
+
   // MAIN LOOP
   while (!quit) {
     cv::Mat frame;
@@ -77,6 +78,7 @@ int main(int argc, char *argv[]) {
     // 5º - Background subtraction
     cv::Mat bgmask;
     bg_sub.ObtainBGMask(frame, bgmask);
+
 
     // 6º - Noise reduction
     cv::Mat element = cv::getStructuringElement(
@@ -148,7 +150,11 @@ void handle_input(int c) {
     break;
 
   case 't': // Toggle background subtraction
-    bg_sub.ToggleBGMask();
+    bg_sub.ToggleBGSubtractor();
+    break;
+
+  case 'h': // Toogle face subtraction
+    bg_sub.ToggleFaceSubtractor();
     break;
 
   case 'd': // Toggle draw lines to fingers

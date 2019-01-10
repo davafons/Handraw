@@ -7,6 +7,7 @@ MyBGSubtractorColor::MyBGSubtractorColor() {
   cv::namedWindow("bg");
 
   bg_subtractor_ = cv::createBackgroundSubtractorMOG2(500, 5, false);
+  face_subtractor_.load("res/haarcascade_frontalface_alt.xml");
 
   cv::createTrackbar("H low:", win_trackbars_, &h_low_, 100);
   cv::createTrackbar("H up:", win_trackbars_, &h_up_, 100);
@@ -111,12 +112,13 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
   while (frame.empty())
     cap >> frame;
 
-  // Parameter 1 means to wipe last model and start relearning
+  // Borrar el último fondo guardado
   cv::Mat hls_frame;
   cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
   bg_subtractor_->apply(hls_frame, temp, 1);
 
-  for (int i = 0; i < max_bg_samples_; ++i) {
+  // Generar un fondo nuevo utilizando tantas imágenes como bg_samples
+  for (int i = 0; i < bg_samples_; ++i) {
     cap >> frame;
     if (frame.empty())
       continue;
@@ -127,20 +129,6 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
 
   bg_subtractor_->getBackgroundImage(temp);
   cv::imshow("bg", temp);
-}
-
-void MyBGSubtractorColor::RemoveBG(cv::Mat frame, cv::Mat &masked_frame) const {
-  // Get foreground mask
-  cv::Mat foreground_mask;
-  bg_subtractor_->apply(frame, foreground_mask, 0);
-  cv::medianBlur(foreground_mask, foreground_mask, 3);
-
-  // Get a masked frame (without most of the bg)
-  cv::Mat result;
-  cv::bitwise_and(frame, frame, result, foreground_mask);
-  masked_frame = result;
-
-  cv::imshow("test", masked_frame);
 }
 
 void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
@@ -164,7 +152,38 @@ void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
     acc += temp_bgmask;
   }
 
+  if(face_subtractor_enabled_)
+    RemoveFace(frame, acc);
+
   acc.copyTo(bgmask);
+}
+
+
+void MyBGSubtractorColor::RemoveBG(cv::Mat frame, cv::Mat &masked_frame) const {
+  // Get foreground mask
+  cv::Mat foreground_mask;
+  bg_subtractor_->apply(frame, foreground_mask, 0);
+  cv::medianBlur(foreground_mask, foreground_mask, 3);
+
+  // Get a masked frame (without most of the bg)
+  cv::Mat result;
+  cv::bitwise_and(frame, frame, result, foreground_mask);
+  masked_frame = result;
+
+  cv::imshow("test", masked_frame);
+}
+
+
+void MyBGSubtractorColor::RemoveFace(cv::Mat frame, cv::Mat &bgmask) const {
+    cv::Mat frame_gray;
+    cv::cvtColor(frame, frame_gray, cv::COLOR_BGR2GRAY);
+
+    std::vector<cv::Rect> faces;
+    face_subtractor_.detectMultiScale(frame_gray, faces);
+
+    for(const auto & face : faces) {
+      cv::rectangle(bgmask, face, cv::Scalar(0, 0, 0), cv::FILLED);
+    }
 }
 
 void MyBGSubtractorColor::clamp(cv::Scalar &s, int low, int up) const {

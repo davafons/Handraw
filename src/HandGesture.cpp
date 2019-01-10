@@ -19,8 +19,7 @@ HandGesture::HandGesture() {
 }
 
 void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
-  fingers_ = 0;
-
+  fingers_.clear();
   std::vector<std::vector<cv::Point>> contours;
 
   // CODIGO 3.1
@@ -35,94 +34,141 @@ void HandGesture::FeaturesDetection(cv::Mat mask, cv::Mat output_img) {
 
   int max_contour_index = -1;
   std::vector<cv::Point> max_contour = contours[0];
-  for(size_t i = 1; i < contours.size(); ++i) {
-    if(contours[i].size() > max_contour.size()) {
+  for (size_t i = 1; i < contours.size(); ++i) {
+    if (contours[i].size() > max_contour.size()) {
       max_contour = contours[i];
       max_contour_index = i;
     }
   }
 
-  // Pintar el contorno
   if (debug_lines_)
     cv::drawContours(output_img, contours, max_contour_index,
                      cv::Scalar(255, 0, 0), 2);
 
+  DetectHandFingers(max_contour, output_img);
+}
+
+void HandGesture::DetectHandFingers(const std::vector<cv::Point> &contour,
+                                    cv::Mat output_img) {
   // Obtenemos el convex hull
   std::vector<cv::Point> hull_points; // Para dibujar y localizar los dedos
-  cv::convexHull(max_contour, hull_points);
+  cv::convexHull(contour, hull_points);
 
   std::vector<int> hull_ints; // Para calcular los defectos de convexidad
-  cv::convexHull(max_contour, hull_ints);
+  cv::convexHull(contour, hull_ints);
+
   // Pintamos el convex hull
   if (debug_lines_)
     cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
 
   // Obtenemos los defectos de convexidad
   std::vector<cv::Vec4i> defects;
-  cv::convexityDefects(max_contour, hull_ints, defects);
+  cv::convexityDefects(contour, hull_ints, defects);
 
-  std::vector<cv::Point> filtered_defects;
-  for (const auto &defect : defects) {
-    cv::Point s = max_contour[defect[0]];
-    cv::Point e = max_contour[defect[1]];
-    cv::Point f = max_contour[defect[2]];
+  if (!use_alternative_method_) {
 
-    float defect_depth = float(defect[3]) / 256.0;
-    double angle = getAngle(s, e, f);
+    std::vector<cv::Point> tips;
+    cv::Point last_point;
+    for(const auto &defect : defects) {
+      cv::Point s = contour[defect[0]];
+      cv::Point e = contour[defect[1]];
+      cv::Point f = contour[defect[2]];
 
-    // CODIGO 3.2
-    // Filtrar y mostrar los defectos de convexidad
-    if (defect_depth < min_depth_)
-      continue;
+      float defect_depth = float(defect[3]) / 256.0;
+      double angle = getAngle(s, e, f);
 
-    if (angle < min_defect_angle_ ||  angle > max_defect_angle_)
-      continue;
+      if (defect_depth < min_depth_)
+        continue;
 
-    if (debug_lines_)
-      cv::circle(output_img, f, 3, cv::Scalar(0, 255, 255), 2);
+      if (angle < min_defect_angle_ || angle > max_defect_angle_)
+        continue;
 
-    filtered_defects.push_back(f);
+      /* if (debug_lines_) */
+      /* cv::circle(output_img, s, 3, cv::scalar(255, 0, 0), 2); */
+      /* cv::circle(output_img, e, 3, cv::scalar(0, 255, 0), 2); */
+      /* cv::circle(output_img, f, 3, cv::scalar(0, 0, 255), 2); */
+      tips.push_back(s);
+      last_point = e;
+    }
+
+    if(tips.empty())
+      return;
+
+    tips.push_back(last_point);
+
+    for(const auto & point : tips) {
+      cv::circle(output_img, point, 5, cv::Scalar(255, 255, 0), -1);
+    }
   }
+  else {
+    // Para los defectos de convexidad, filtramos solo los que nos interesen
+    std::vector<cv::Point> filtered_defects;
+    for (const auto &defect : defects) {
+      cv::Point s = contour[defect[0]];
+      cv::Point e = contour[defect[1]];
+      cv::Point f = contour[defect[2]];
 
-  // A minimum of 3 defects is needed to calculate the center of the hand
-  if (filtered_defects.empty() || filtered_defects.size() < 3)
-    return;
+      float defect_depth = float(defect[3]) / 256.0;
+      double angle = getAngle(s, e, f);
 
-  // Get palm center (Used as a point of reference for finger counting)
-  cv::Point2f palm_center;
-  float palm_radius;
-  cv::minEnclosingCircle(filtered_defects, palm_center, palm_radius);
-  float min_palm_radius = palm_radius + palm_threshold_;
+      // CODIGO 3.2
+      // Filtrar y mostrar los defectos de convexidad
+      if (defect_depth < min_depth_)
+        continue;
 
-  if (debug_lines_) {
-    cv::circle(output_img, palm_center, 4, cv::Scalar(0, 255, 0), 3);
-    cv::circle(output_img, palm_center, palm_radius, cv::Scalar(0, 255, 0), 2);
-    cv::circle(output_img, palm_center, min_palm_radius, cv::Scalar(0, 255, 0),
-               2);
-  }
+      if (angle < min_defect_angle_ || angle > max_defect_angle_)
+        continue;
 
-  // Merge points of convex hull
-  std::vector<cv::Point> merged_points = mergeNearPoints(hull_points);
+      if (debug_lines_)
+        cv::circle(output_img, f, 3, cv::Scalar(0, 255, 255), 2);
 
-  // Count fingers
-  for (const auto &point : merged_points) {
-    if (fingers_ == 5)
-      break;
+      filtered_defects.push_back(f);
+    }
 
-    if (point.y - 70 > palm_center.y)
-      continue;
+    // Son necesarios como mínimo 3 defectos para calcular el centro de la mano
+    if (filtered_defects.empty() || filtered_defects.size() < 3)
+      return;
 
-    // Get distance between palm center and finger
-    float finger_length = cv::norm(palm_center - cv::Point2f(point));
-    if (finger_length < min_palm_radius)
-      continue;
+    // El punto del centro de la mano se utiliza como referencia para las
+    // distancias. El radio del círculo hace los cálculos invariables a la
+    // escala
+    cv::Point2f palm_center;
+    float palm_radius;
+    cv::minEnclosingCircle(filtered_defects, palm_center, palm_radius);
+    float min_palm_radius = palm_radius + palm_threshold_;
 
-    ++fingers_;
+    if (debug_lines_) {
+      cv::circle(output_img, palm_center, 4, cv::Scalar(0, 255, 0), 3);
+      cv::circle(output_img, palm_center, palm_radius, cv::Scalar(0, 255, 0),
+                 2);
+      cv::circle(output_img, palm_center, min_palm_radius,
+                 cv::Scalar(0, 255, 0), 2);
+    }
 
-    if (debug_lines_)
-      cv::line(output_img, point, palm_center, cv::Scalar(0, 0, 255), 2);
+    // Merge points of convex hull
+    std::vector<cv::Point> merged_points = mergeNearPoints(hull_points);
 
-    cv::circle(output_img, point, 6, cv::Scalar(0, 255, 255), 3);
+    // Para cada punto del convex hull, contar si es un dedo
+    for (const auto &point : merged_points) {
+      if (fingers_.size() == 5) // Parar desde que se detecten 5 dedos
+        break;
+
+      // No contar puntos que estén por debajo del centro
+      if (point.y - 70 > palm_center.y)
+        continue;
+
+      // Get distance between palm center and finger
+      float finger_length = cv::norm(palm_center - cv::Point2f(point));
+      if (finger_length < min_palm_radius)
+        continue;
+
+      fingers_.push_back(point);
+
+      if (debug_lines_)
+        cv::line(output_img, point, palm_center, cv::Scalar(0, 0, 255), 2);
+
+      cv::circle(output_img, point, 6, cv::Scalar(0, 255, 255), 3);
+    }
   }
 }
 
@@ -174,7 +220,13 @@ HandGesture::mergeNearPoints(const std::vector<cv::Point> &points) const {
     acc_points.push_back(points[i]);
   }
 
-  /* std::cout << "--" << std::endl; */
+  cv::Point total =
+      std::accumulate(acc_points.cbegin(), acc_points.cend(), cv::Point(0));
+  cv::Point mean_point(total.x / acc_points.size(),
+                        total.y / acc_points.size());
+  merged_points.push_back(mean_point);
+
+  std::cout << acc_points.size() << "--" << std::endl;
 
   return merged_points;
 }
