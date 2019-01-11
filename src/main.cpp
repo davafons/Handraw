@@ -7,9 +7,10 @@
 #include "HandGesture.h"
 #include "MyBGSubtractorColor.h"
 
-// Function declaration
+// Functions declaration
 void open_camera(cv::VideoCapture &cap);
-void correct_median_size(int, void *userdata);
+void correct_median_size(int, void *);
+void update_structuring_element(int, void *);
 void handle_input(int c);
 
 // Global variables
@@ -18,13 +19,18 @@ const int MAX_EMPTY_FRAMES_TO_READ = 2000;
 bool quit = false;
 bool draw_enabled = false;
 
+int dilation_size = 2;
+int median_size = 9;
+cv::Mat element = cv::getStructuringElement(
+    cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
+
 cv::VideoCapture cap;
 MyBGSubtractorColor bg_sub;
 HandGesture hand_detector;
 
 int main(int argc, char *argv[]) {
 
-  // 1º - Open camera
+  // 1º - Abrir cámara
   try {
     open_camera(cap);
   } catch (const std::runtime_error &e) {
@@ -32,10 +38,10 @@ int main(int argc, char *argv[]) {
     return EXIT_FAILURE;
   }
 
-  // 3º - Get an image of the background for BG Subtraction
+  // 2º - Obtener una imagen estática del fondo (Para luego aplicar BG Sub)
   bg_sub.LearnBGModel(cap);
 
-  // 3º - Get average color of the skin using samples from camera or file
+  // 3º - Obtener el modelo (color) de la mano para poder distinguirla
   if (argc >= 2) {
     std::ifstream means_file;
     try {
@@ -50,7 +56,7 @@ int main(int argc, char *argv[]) {
     bg_sub.LearnModel(cap);
   }
 
-  // 4º - Create windows
+  // 4º - Crear ventanas para mostrar los resultados y trackbars
   const std::string reconocimiento = "Reconocimiento";
   const std::string fondo = "Fondo";
   cv::namedWindow(reconocimiento);
@@ -58,12 +64,10 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(fondo);
   cv::moveWindow(fondo, 750, 50);
 
-  int dilation_size = 2;
-  cv::createTrackbar("Dilation size:", fondo, &dilation_size, 40, nullptr);
-
-  int median_size = 9;
+  cv::createTrackbar("Dilation size:", fondo, &dilation_size, 40,
+                     update_structuring_element);
   cv::createTrackbar("Median size:", fondo, &median_size, 40,
-                     correct_median_size, &median_size);
+                     correct_median_size);
 
   // MAIN LOOP
   while (!quit) {
@@ -75,42 +79,35 @@ int main(int argc, char *argv[]) {
       continue;
     }
 
-    // 5º - Background subtraction
+    // 5º - Eliminar el fondo y obtener la máscara binaria
     cv::Mat bgmask;
     bg_sub.ObtainBGMask(frame, bgmask);
 
-    // 6º - Noise reduction
-    cv::Mat element = cv::getStructuringElement(
-        cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
-
+    // 6º - Reducir el ruido de la máscara binaria
     cv::medianBlur(bgmask, bgmask, median_size);
     cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
     cv::dilate(bgmask, bgmask, element);
 
-    // 7º - Features detection (fingers)
+    // 7º - Detectar defectos de convexidad y dedos
     hand_detector.FeaturesDetection(bgmask, frame);
 
-    // 7Aº - Drawing
+    // 7Aº - Dibujar
     if (draw_enabled)
       hand_detector.FingerDrawing(frame);
 
-    // 7Bº - Hand movement
+    // 7Bº - Detectar dirección de movimiento de la mano
     hand_detector.DetectHandMovement(frame);
 
+    // 8º - Mostrar los resultados
     cv::flip(frame, frame, 1);
 
-    // Write the number of found fingers
     cv::putText(frame, std::to_string(hand_detector.getFingerCount()),
                 {520, 75}, cv::FONT_HERSHEY_SIMPLEX, 2, {255, 255, 255}, 3);
-
-    // Write the hand direction
     cv::putText(frame, hand_detector.getHandDirection(), {410, 460},
                 cv::FONT_HERSHEY_SIMPLEX, 1, {0, 0, 255}, 2);
-
     cv::putText(frame, hand_detector.getMessage(), {430, 410},
                 cv::FONT_HERSHEY_SIMPLEX, 1, {0, 255, 255}, 2);
 
-    // 8º - Display results
     cv::imshow(reconocimiento, frame);
     cv::flip(bgmask, bgmask, 1);
     cv::imshow(fondo, bgmask);
@@ -136,44 +133,44 @@ void open_camera(cv::VideoCapture &cap) {
 
   if (cont >= MAX_EMPTY_FRAMES_TO_READ)
     throw std::runtime_error(
-        "No se ha podido leer un frame valido tras iniciar la cámara!");
+        "No se ha podido leer ningún frame valido tras iniciar la cámara!");
 }
 
-void correct_median_size(int, void *userdata) {
-  // Median size must be always even
-  int &median_size = *reinterpret_cast<int *>(userdata);
+void correct_median_size(int, void *) {
+  // Median size siempre debe ser impar
   if (median_size % 2 == 0)
     ++median_size;
+}
+
+void update_structuring_element(int, void *) {
+  element = cv::getStructuringElement(
+      cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
 }
 
 void handle_input(int c) {
   switch (c) {
   case 27:  // Escape key
-  case 'q': // Exit app
+  case 'q': // Salir de la app
     quit = true;
     break;
 
-  case 'r': // Relearn samples
+  case 'r': // Reaprender modelo
     bg_sub.LearnModel(cap);
     break;
 
-  case 'b': // Relearn background
+  case 'b': // Reaprender fondo
     bg_sub.LearnBGModel(cap);
     break;
 
-  case 't': // Toggle background subtraction
+  case 't': // Activar BG Sub
     bg_sub.ToggleBGSubtractor();
     break;
 
-  case 'h': // Toogle face subtraction
-    bg_sub.ToggleFaceSubtractor();
-    break;
-
-  case 'd': // Toggle draw lines to fingers
+  case 'd': // Mostrar las líneas de debug
     hand_detector.ToggleDebugLines();
     break;
 
-  case 'k':
+  case 'k': // Activar dibujar
     draw_enabled = !draw_enabled;
     break;
   }
