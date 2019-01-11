@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include <queue>
+#include <string>
 
 #include <opencv2/opencv.hpp>
 
@@ -10,10 +10,12 @@ public:
   HandGesture();
   void FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img);
   void FingerDrawing(cv::Mat &output_img);
+  void DetectHandMovement(cv::Mat &output_img);
 
   void ToggleDebugLines() { debug_lines_ = !debug_lines_; };
 
   int getFingerCount() const { return finger_tips_.size(); }
+  std::string getHandDirection() const { return hand_direction_; }
 
 private:
   // Convexity defects filtering
@@ -33,8 +35,14 @@ private:
   cv::Rect red_rect{100, 0, 80, 80};
   cv::Rect blue_rect{180, 0, 80, 80};
   cv::Rect green_rect{260, 0, 80, 80};
+  cv::Rect clear_rect{0, 0, 80, 80};
   std::vector<cv::Point> current_line_;
   std::vector<std::pair<std::vector<cv::Point>, cv::Scalar>> drawn_lines_;
+
+  // Motion detection
+  std::vector<cv::Point> hand_points_{10, cv::Point(0)};
+  int hand_points_index_{0};
+  std::string hand_direction_{""};
 
   // Window
   const std::string win_gest_trackbars{"Gesture Trackbacks"};

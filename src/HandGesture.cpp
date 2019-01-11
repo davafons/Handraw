@@ -53,6 +53,14 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   // Calculamos el bounding rect (Para operaciones invariables a escala)
   cv::Rect hand_rect = cv::boundingRect(hull_points);
 
+  // El centro del bounding rect lo guardamos para trackear el movimiento de la
+  // mano
+  cv::Point hand_rect_center = cv::Point(hand_rect.x + hand_rect.width / 2,
+                                         hand_rect.y + hand_rect.height / 2);
+
+  hand_points_[hand_points_index_ % hand_points_.size()] = hand_rect_center;
+  ++hand_points_index_;
+
   // Pintamos el convex hull y el bounding rect
   if (debug_lines_) {
     cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
@@ -66,7 +74,8 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   // Detectamos las puntas de los dedos a partir de los defectos
   finger_tips_.clear();
 
-  cv::Point last_point;
+  finger_tips_.push_back(max_contour[defects[0][0]]);
+
   for (const auto &defect : defects) {
     if (finger_tips_.size() >= 5)
       break;
@@ -88,8 +97,7 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
     if (debug_lines_)
       cv::circle(output_img, f, 3, cv::Scalar(0, 0, 255), 2);
 
-    finger_tips_.push_back(s);
-    last_point = e;
+    finger_tips_.push_back(e);
   }
 
   for (const auto &point : finger_tips_)
@@ -101,34 +109,39 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
   cv::rectangle(output_img, red_rect, cv::Scalar(0, 0, 255), cv::FILLED);
   cv::rectangle(output_img, green_rect, cv::Scalar(0, 255, 0), cv::FILLED);
   cv::rectangle(output_img, blue_rect, cv::Scalar(255, 0, 0), cv::FILLED);
+  cv::rectangle(output_img, clear_rect, cv::Scalar(255, 255, 255), cv::FILLED);
   cv::circle(output_img, cv::Point(580, 40), 30, drawing_color_, cv::FILLED);
 
   bool changing_color = false;
-  if(finger_tips_.size() >= 1) {
+  if (finger_tips_.size() >= 1) {
     cv::Scalar new_color(0);
-    for(const auto & tip : finger_tips_) {
-      if(red_rect.contains(tip))
+    for (const auto &tip : finger_tips_) {
+      if (red_rect.contains(tip))
         new_color += cv::Scalar(0, 0, 255);
-      if(green_rect.contains(tip))
+      if (green_rect.contains(tip))
         new_color += cv::Scalar(0, 255, 0);
-      if(blue_rect.contains(tip))
+      if (blue_rect.contains(tip))
         new_color += cv::Scalar(255, 0, 0);
+      if (clear_rect.contains(tip)) {
+        drawn_lines_.clear();
+        current_line_.clear();
+      }
     }
-    std::cout << new_color << "\n";
 
-    if(new_color != cv::Scalar(0, 0, 0)) {
+    if (new_color != cv::Scalar(0, 0, 0)) {
+      std::cout << new_color << "\n";
       drawing_color_ = new_color;
       changing_color = true;
 
-      if(!current_line_.empty()) {
+      if (!current_line_.empty()) {
         drawn_lines_.push_back(std::make_pair(current_line_, drawing_color_));
         current_line_.clear();
       }
     }
   }
 
-  if(finger_tips_.size() == 1) {
-    if(!changing_color) {
+  if (finger_tips_.size() == 1) {
+    if (!changing_color) {
       current_line_.push_back(cv::Point(finger_tips_.front()));
     }
   }
@@ -136,8 +149,39 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
   // Draw lines
   cv::polylines(output_img, current_line_, false, drawing_color_, 2);
 
-  for(const auto & line_color : drawn_lines_)
+  for (const auto &line_color : drawn_lines_)
     cv::polylines(output_img, line_color.first, false, line_color.second, 2);
+}
+
+void HandGesture::DetectHandMovement(cv::Mat &output_img) {
+  for (const auto &point : hand_points_) {
+    cv::circle(output_img, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
+    std::cout << point << std::endl;
+  }
+
+  hand_direction_.clear();
+
+  int dX = hand_points_[hand_points_index_ % hand_points_.size()].x -
+           hand_points_[(hand_points_index_ - 1) % hand_points_.size()].x;
+  int dY = hand_points_[hand_points_index_ % hand_points_.size()].y -
+           hand_points_[(hand_points_index_ - 1) % hand_points_.size()].y;
+
+  if (std::abs(dX) > 40) {
+    if (dX > 0)
+      hand_direction_ += "Derecha";
+    else
+      hand_direction_ += "Izquierda";
+  }
+
+  if (std::abs(dY) > 40) {
+    if (dY > 0)
+      hand_direction_ += "Arriba";
+    else
+      hand_direction_ += "Abajo";
+  }
+
+  if (hand_direction_.empty())
+    hand_direction_ += "Quieta";
 }
 
 double HandGesture::getAngle(cv::Point s, cv::Point e, cv::Point f) {

@@ -16,6 +16,7 @@ void handle_input(int c);
 const int MAX_EMPTY_FRAMES_TO_READ = 2000;
 
 bool quit = false;
+bool draw_enabled = false;
 
 cv::VideoCapture cap;
 MyBGSubtractorColor bg_sub;
@@ -57,13 +58,12 @@ int main(int argc, char *argv[]) {
   cv::namedWindow(fondo);
   cv::moveWindow(fondo, 750, 50);
 
-  int dilation_size = 3;
+  int dilation_size = 2;
   cv::createTrackbar("Dilation size:", fondo, &dilation_size, 40, nullptr);
 
-  int median_size = 11;
+  int median_size = 9;
   cv::createTrackbar("Median size:", fondo, &median_size, 40,
                      correct_median_size, &median_size);
-
 
   // MAIN LOOP
   while (!quit) {
@@ -79,7 +79,6 @@ int main(int argc, char *argv[]) {
     cv::Mat bgmask;
     bg_sub.ObtainBGMask(frame, bgmask);
 
-
     // 6º - Noise reduction
     cv::Mat element = cv::getStructuringElement(
         cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
@@ -91,16 +90,22 @@ int main(int argc, char *argv[]) {
     // 7º - Features detection (fingers)
     hand_detector.FeaturesDetection(bgmask, frame);
 
+    // 7Aº - Drawing
+    if (draw_enabled)
+      hand_detector.FingerDrawing(frame);
 
-    // 7Aº - Drawing!
-    hand_detector.FingerDrawing(frame);
+    // 7Bº - Hand movement
+    hand_detector.DetectHandMovement(frame);
 
     cv::flip(frame, frame, 1);
+
     // Write the number of found fingers
     cv::putText(frame, std::to_string(hand_detector.getFingerCount()),
-                {190, 75}, cv::FONT_HERSHEY_PLAIN, 6,
-                cv::Scalar(255, 255, 255), 6);
+                {190, 75}, cv::FONT_HERSHEY_SIMPLEX, 3, {255, 255, 255}, 3);
 
+    // Write the hand direction
+    cv::putText(frame, hand_detector.getHandDirection(), {420, 460},
+                cv::FONT_HERSHEY_SIMPLEX, 1, {0, 0, 255}, 2);
 
     // 8º - Display results
     cv::imshow(reconocimiento, frame);
@@ -163,6 +168,10 @@ void handle_input(int c) {
 
   case 'd': // Toggle draw lines to fingers
     hand_detector.ToggleDebugLines();
+    break;
+
+  case 'k':
+    draw_enabled = !draw_enabled;
     break;
   }
 }
