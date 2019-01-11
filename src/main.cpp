@@ -91,14 +91,18 @@ int main(int argc, char *argv[]) {
     // 7º - Features detection (fingers)
     hand_detector.FeaturesDetection(bgmask, frame);
 
-    // 8º - Display results
-    cv::flip(frame, frame, 1);
 
+    // 7Aº - Drawing!
+    hand_detector.FingerDrawing(frame);
+
+    cv::flip(frame, frame, 1);
     // Write the number of found fingers
     cv::putText(frame, std::to_string(hand_detector.getFingerCount()),
-                {150, 150}, cv::FONT_HERSHEY_PLAIN, 8,
-                cv::Scalar(255, 255, 255), 8);
+                {190, 75}, cv::FONT_HERSHEY_PLAIN, 6,
+                cv::Scalar(255, 255, 255), 6);
 
+
+    // 8º - Display results
     cv::imshow(reconocimiento, frame);
     cv::flip(bgmask, bgmask, 1);
     cv::imshow(fondo, bgmask);

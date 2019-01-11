@@ -1,7 +1,7 @@
 #include "MyBGSubtractorColor.h"
 
 MyBGSubtractorColor::MyBGSubtractorColor() {
-  cv::namedWindow(win_trackbars_, cv::WINDOW_GUI_EXPANDED);
+  cv::namedWindow(win_trackbars_);
   cv::moveWindow(win_trackbars_, 1400, 50);
   cv::namedWindow("test");
   cv::namedWindow("bg");
@@ -131,7 +131,8 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
   cv::imshow("bg", temp);
 }
 
-void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
+void MyBGSubtractorColor::ObtainBGMask(const cv::Mat &frame,
+                                       cv::Mat &bgmask) const {
   cv::Mat hls_frame;
   cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
@@ -152,14 +153,14 @@ void MyBGSubtractorColor::ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const {
     acc += temp_bgmask;
   }
 
-  if(face_subtractor_enabled_)
+  if (face_subtractor_enabled_)
     RemoveFace(frame, acc);
 
   acc.copyTo(bgmask);
 }
 
-
-void MyBGSubtractorColor::RemoveBG(cv::Mat frame, cv::Mat &masked_frame) const {
+void MyBGSubtractorColor::RemoveBG(const cv::Mat &frame,
+                                   cv::Mat &masked_frame) const {
   // Get foreground mask
   cv::Mat foreground_mask;
   bg_subtractor_->apply(frame, foreground_mask, 0);
@@ -173,17 +174,17 @@ void MyBGSubtractorColor::RemoveBG(cv::Mat frame, cv::Mat &masked_frame) const {
   cv::imshow("test", masked_frame);
 }
 
+void MyBGSubtractorColor::RemoveFace(const cv::Mat &frame,
+                                     cv::Mat &bgmask) const {
+  cv::Mat frame_gray;
+  cv::cvtColor(frame, frame_gray, cv::COLOR_BGR2GRAY);
 
-void MyBGSubtractorColor::RemoveFace(cv::Mat frame, cv::Mat &bgmask) const {
-    cv::Mat frame_gray;
-    cv::cvtColor(frame, frame_gray, cv::COLOR_BGR2GRAY);
+  std::vector<cv::Rect> faces;
+  face_subtractor_.detectMultiScale(frame_gray, faces);
 
-    std::vector<cv::Rect> faces;
-    face_subtractor_.detectMultiScale(frame_gray, faces);
-
-    for(const auto & face : faces) {
-      cv::rectangle(bgmask, face, cv::Scalar(0, 0, 0), cv::FILLED);
-    }
+  for (const auto &face : faces) {
+    cv::rectangle(bgmask, face, cv::Scalar(0, 0, 0), cv::FILLED);
+  }
 }
 
 void MyBGSubtractorColor::clamp(cv::Scalar &s, int low, int up) const {

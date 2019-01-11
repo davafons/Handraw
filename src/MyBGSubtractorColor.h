@@ -17,15 +17,15 @@ public:
 
   // BG Model
   void LearnBGModel(cv::VideoCapture &cap);
-  void RemoveBG(cv::Mat frame, cv::Mat &masked_frame);
-  void ObtainBGMask(cv::Mat frame, cv::Mat &bgmask) const;
+  void ObtainBGMask(const cv::Mat &frame, cv::Mat &bgmask) const;
 
   // Toggle components of the BG subtractor
-  void ToggleBGSubtractor() { bg_subtractor_enabled_ = !bg_subtractor_enabled_; }
+  void ToggleBGSubtractor() {
+    bg_subtractor_enabled_ = !bg_subtractor_enabled_;
+  }
   void ToggleFaceSubtractor() {
     face_subtractor_enabled_ = !face_subtractor_enabled_;
   };
-
 
 private:
   // Thresholds for skin color detection
@@ -34,7 +34,7 @@ private:
   int s_low_{74}, s_up_{21};
   std::vector<cv::Scalar> means_;
 
-  // Samples used in skin model learning
+  // Settings of samples used in skin model learning
   int max_horiz_samples_{3};
   int max_vert_samples_{6};
   int distance_between_samples_{30};
@@ -53,8 +53,8 @@ private:
   const std::string win_trackbars_{"Trackbars"};
 
 private:
-  void RemoveBG(cv::Mat frame, cv::Mat &masked_frame) const;
-  void RemoveFace(cv::Mat frame, cv::Mat &bgmask) const;
+  void RemoveBG(const cv::Mat &frame, cv::Mat &masked_frame) const;
+  void RemoveFace(const cv::Mat &frame, cv::Mat &bgmask) const;
 
   void clamp(cv::Scalar &s, int low = 0, int up = 255) const;
 };
