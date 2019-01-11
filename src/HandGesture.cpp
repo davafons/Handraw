@@ -13,6 +13,8 @@ HandGesture::HandGesture() {
                      270);
   cv::createTrackbar("Max defect angle", win_gest_trackbars, &max_defect_angle_,
                      270);
+
+  ok_image = cv::imread("res/ok1.jpg");
 }
 void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
@@ -113,12 +115,38 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
     cv::circle(output_img, point, 5, cv::Scalar(255, 255, 0), -1);
 
   message_ = "";
+
   if (finger_count_ == 3) {
     cv::Point s = max_contour[filtered_defects[1][0]];
     cv::Point e = max_contour[filtered_defects[1][1]];
 
-    if(cv::norm(s - e) > 120)
+    if (cv::norm(s - e) > hand_rect.width * 0.56)
       message_ = "Rock!";
+  } else if (finger_count_ == 2) {
+    cv::Point s = max_contour[filtered_defects[0][0]];
+    cv::Point e = max_contour[filtered_defects[0][1]];
+    cv::Point f = max_contour[filtered_defects[0][2]];
+    double angle = getAngle(s, e, f);
+    std::cout << angle << std::endl;
+
+    if (angle > 90 && angle < 120)
+      message_ = "Loser!";
+    else if (angle > 20 && angle < 60)
+      message_ = "Peace!";
+
+  } else if (finger_count_ == 4) {
+    cv::Point s = max_contour[filtered_defects[0][0]];
+    cv::Point e = max_contour[filtered_defects[0][1]];
+    cv::Point f = max_contour[filtered_defects[0][2]];
+    double angle = getAngle(s, e, f);
+
+    cv::Point f2 = max_contour[filtered_defects[1][2]];
+    int dist_f1_f2 = cv::norm(f - f2);
+
+    if (angle > 50 && cv::abs(s.y - e.y) > hand_rect.height * 0.25 &&
+        dist_f1_f2 < hand_rect.height * 0.2) {
+      message_ = "OK";
+    }
   }
 }
 
@@ -168,9 +196,12 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
 }
 
 void HandGesture::DetectHandMovement(cv::Mat &output_img) {
-  for (size_t i = 0; i < hand_points_.size(); ++i) {
-    cv::circle(output_img, hand_points_[i], 5, cv::Scalar(0, 0, 255),
-               cv::FILLED);
+  for (size_t i = 0; i < hand_points_.size() - 1; ++i) {
+    cv::line(output_img,
+             hand_points_[(i + hand_points_index_) % hand_points_.size()],
+             hand_points_[(i + hand_points_index_ + 1) % hand_points_.size()],
+             cv::Scalar(0, 0, 255),
+             11 - (10.0f / hand_points_.size()) * (hand_points_.size() - i));
   }
 
   hand_direction_.clear();

@@ -42,7 +42,7 @@ private:
 
   // Subtractor for removing background before skin detection
   cv::Ptr<cv::BackgroundSubtractorMOG2> bg_subtractor_;
-  int bg_samples_{30};
+  int bg_samples_{20};
   bool bg_subtractor_enabled_{true};
 
   // Haar cascade classifier for face subtraction (SLOW!)

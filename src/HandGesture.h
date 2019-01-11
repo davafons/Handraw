@@ -3,7 +3,7 @@
 #include <queue>
 #include <string>
 
-#include <opencv2/opencv.hpp> 
+#include <opencv2/opencv.hpp>
 class HandGesture {
 public:
   HandGesture();
@@ -44,6 +44,8 @@ private:
   int hand_points_index_{0};
   std::string hand_direction_{""};
   std::string message_{""};
+
+  cv::Mat ok_image;
 
   // Window
   const std::string win_gest_trackbars{"Gesture Trackbacks"};
