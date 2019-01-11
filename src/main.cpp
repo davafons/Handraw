@@ -101,11 +101,14 @@ int main(int argc, char *argv[]) {
 
     // Write the number of found fingers
     cv::putText(frame, std::to_string(hand_detector.getFingerCount()),
-                {190, 75}, cv::FONT_HERSHEY_SIMPLEX, 3, {255, 255, 255}, 3);
+                {520, 75}, cv::FONT_HERSHEY_SIMPLEX, 2, {255, 255, 255}, 3);
 
     // Write the hand direction
-    cv::putText(frame, hand_detector.getHandDirection(), {420, 460},
+    cv::putText(frame, hand_detector.getHandDirection(), {410, 460},
                 cv::FONT_HERSHEY_SIMPLEX, 1, {0, 0, 255}, 2);
+
+    cv::putText(frame, hand_detector.getMessage(), {430, 410},
+                cv::FONT_HERSHEY_SIMPLEX, 1, {0, 255, 255}, 2);
 
     // 8º - Display results
     cv::imshow(reconocimiento, frame);

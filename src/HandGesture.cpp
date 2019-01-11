@@ -7,15 +7,13 @@
 
 HandGesture::HandGesture() {
   cv::namedWindow(win_gest_trackbars);
-  cv::createTrackbar("Min depth", win_gest_trackbars, &min_depth_, 200);
+  cv::createTrackbar("Scale percentage", win_gest_trackbars, &scale_percentage_,
+                     100);
   cv::createTrackbar("Min defect angle", win_gest_trackbars, &min_defect_angle_,
                      270);
   cv::createTrackbar("Max defect angle", win_gest_trackbars, &max_defect_angle_,
                      270);
-  cv::createTrackbar("Scale percentage", win_gest_trackbars, &scale_percentage_,
-                     100);
 }
-
 void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
   // CODIGO 3.1
@@ -73,9 +71,9 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
   // Detectamos las puntas de los dedos a partir de los defectos
   finger_tips_.clear();
+  finger_count_ = 0;
 
-  finger_tips_.push_back(max_contour[defects[0][0]]);
-
+  std::vector<cv::Vec4i> filtered_defects;
   for (const auto &defect : defects) {
     if (finger_tips_.size() >= 5)
       break;
@@ -97,11 +95,31 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
     if (debug_lines_)
       cv::circle(output_img, f, 3, cv::Scalar(0, 0, 255), 2);
 
+    filtered_defects.push_back(defect);
     finger_tips_.push_back(e);
   }
 
+  finger_count_ = finger_tips_.size() + 1;
+
+  if (finger_tips_.size() == 0) {
+    int hand_rect_ratio = std::abs(hand_rect.width - hand_rect.height);
+    if (hand_rect_ratio < 80)
+      finger_count_ = 0;
+  } else if (finger_tips_.size() == 1) {
+    if (hand_rect.width > hand_rect.height)
+      finger_count_ = 1;
+  }
   for (const auto &point : finger_tips_)
     cv::circle(output_img, point, 5, cv::Scalar(255, 255, 0), -1);
+
+  message_ = "";
+  if (finger_count_ == 3) {
+    cv::Point s = max_contour[filtered_defects[1][0]];
+    cv::Point e = max_contour[filtered_defects[1][1]];
+
+    if(cv::norm(s - e) > 120)
+      message_ = "Rock!";
+  }
 }
 
 void HandGesture::FingerDrawing(cv::Mat &output_img) {
@@ -112,9 +130,10 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
   cv::rectangle(output_img, clear_rect, cv::Scalar(255, 255, 255), cv::FILLED);
   cv::circle(output_img, cv::Point(580, 40), 30, drawing_color_, cv::FILLED);
 
-  bool changing_color = false;
-  if (finger_tips_.size() >= 1) {
+  if (finger_count_ >= 2) {
+
     cv::Scalar new_color(0);
+
     for (const auto &tip : finger_tips_) {
       if (red_rect.contains(tip))
         new_color += cv::Scalar(0, 0, 255);
@@ -129,22 +148,17 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
     }
 
     if (new_color != cv::Scalar(0, 0, 0)) {
-      std::cout << new_color << "\n";
-      drawing_color_ = new_color;
-      changing_color = true;
-
       if (!current_line_.empty()) {
         drawn_lines_.push_back(std::make_pair(current_line_, drawing_color_));
         current_line_.clear();
       }
+
+      drawing_color_ = new_color;
     }
   }
 
-  if (finger_tips_.size() == 1) {
-    if (!changing_color) {
-      current_line_.push_back(cv::Point(finger_tips_.front()));
-    }
-  }
+  if (finger_count_ == 1)
+    current_line_.push_back(cv::Point(finger_tips_.front()));
 
   // Draw lines
   cv::polylines(output_img, current_line_, false, drawing_color_, 2);
@@ -154,9 +168,9 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
 }
 
 void HandGesture::DetectHandMovement(cv::Mat &output_img) {
-  for (const auto &point : hand_points_) {
-    cv::circle(output_img, point, 5, cv::Scalar(0, 0, 255), cv::FILLED);
-    std::cout << point << std::endl;
+  for (size_t i = 0; i < hand_points_.size(); ++i) {
+    cv::circle(output_img, hand_points_[i], 5, cv::Scalar(0, 0, 255),
+               cv::FILLED);
   }
 
   hand_direction_.clear();
@@ -182,6 +196,20 @@ void HandGesture::DetectHandMovement(cv::Mat &output_img) {
 
   if (hand_direction_.empty())
     hand_direction_ += "Quieta";
+
+  /* int start_end_diff = */
+  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() - 1].x);
+   */
+  /* int start_mid_diff = */
+  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() / 2].x);
+   */
+
+  /* if (start_end_diff < 40 && start_mid_diff < 150) */
+  /*   message_ = "Hola!"; */
+  /* else */
+  /*   message_ = ""; */
+
+  /* std::cout << start_end_diff << " - " << start_mid_diff << std::endl; */
 }
 
 double HandGesture::getAngle(cv::Point s, cv::Point e, cv::Point f) {

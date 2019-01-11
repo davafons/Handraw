@@ -81,7 +81,7 @@ void MyBGSubtractorColor::LearnModel(cv::VideoCapture &cap) {
   // almacenar las medias en la variable means_
 
   cv::Mat hls_frame;
-  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2YCrCb);
+  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
   means_.clear();
   for (const auto &sample : samples_positions) {
@@ -114,7 +114,7 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
 
   // Borrar el último fondo guardado
   cv::Mat hls_frame;
-  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2YCrCb);
+  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
   bg_subtractor_->apply(hls_frame, temp, 1);
 
   // Generar un fondo nuevo utilizando tantas imágenes como bg_samples
@@ -123,7 +123,7 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
     if (frame.empty())
       continue;
 
-    cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2YCrCb);
+    cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
     bg_subtractor_->apply(hls_frame, temp);
   }
 
@@ -134,7 +134,7 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) {
 void MyBGSubtractorColor::ObtainBGMask(const cv::Mat &frame,
                                        cv::Mat &bgmask) const {
   cv::Mat hls_frame;
-  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2YCrCb);
+  cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
   if (bg_subtractor_enabled_)
     RemoveBG(hls_frame, hls_frame);

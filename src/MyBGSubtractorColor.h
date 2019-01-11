@@ -29,9 +29,9 @@ public:
 
 private:
   // Thresholds for skin color detection
-  int h_low_{18}, h_up_{17};
-  int l_low_{13}, l_up_{73};
-  int s_low_{31}, s_up_{9};
+  int h_low_{80}, h_up_{7};
+  int l_low_{14}, l_up_{80};
+  int s_low_{18}, s_up_{70};
   std::vector<cv::Scalar> means_;
 
   // Settings of samples used in skin model learning
