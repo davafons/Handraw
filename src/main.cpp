@@ -97,6 +97,7 @@ int main(int argc, char *argv[]) {
 
     // 7Bº - Detectar dirección de movimiento de la mano
     hand_detector.DetectHandMovement(frame);
+    hand_detector.DetectHandGestures();
 
     // 8º - Mostrar los resultados
     cv::flip(frame, frame, 1);

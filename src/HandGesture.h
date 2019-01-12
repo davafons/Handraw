@@ -9,6 +9,7 @@ public:
   HandGesture();
   void FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img);
   void FingerDrawing(cv::Mat &output_img);
+  void DetectHandGestures();
   void DetectHandMovement(cv::Mat &output_img);
 
   void ToggleDebugLines() { debug_lines_ = !debug_lines_; };
@@ -18,19 +19,23 @@ public:
   std::string getMessage() const { return message_; }
 
 private:
-  // Convexity defects filtering
+  // Valores para filtar los convexity defects
   int scale_percentage_{25};
   int min_defect_angle_{15};
   int max_defect_angle_{120};
 
   // Fingers detection
-  std::vector<cv::Point> finger_tips_;
-  int finger_count_ = 0;
+  std::vector<cv::Point> max_contour_;
+  cv::Rect hand_rect_;
 
-  // Draw debug lines (contour, convexity defects, bounding rect)
+  int finger_count_ = 0;
+  std::vector<cv::Point> finger_tips_;
+  std::vector<cv::Vec4i> filtered_defects_;
+
+  // Mostrar bounding rect/contour/convexity defects...
   bool debug_lines_{true};
 
-  // Drawing
+  // Objetos utilizados para dibujo
   cv::Scalar drawing_color_{255, 0, 0};
   cv::Rect red_rect{420, 400, 80, 80};
   cv::Rect blue_rect{340, 400, 80, 80};
@@ -45,10 +50,8 @@ private:
   std::string hand_direction_{""};
   std::string message_{""};
 
-  cv::Mat ok_image;
-
   // Window
-  const std::string win_gest_trackbars{"Gesture Trackbacks"};
+  const std::string w_gest_trackbars_{"Gesture Trackbacks"};
 
 private:
   double getAngle(cv::Point s, cv::Point e, cv::Point f);

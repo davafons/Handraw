@@ -6,16 +6,15 @@
 #include "HandGesture.h"
 
 HandGesture::HandGesture() {
-  cv::namedWindow(win_gest_trackbars);
-  cv::createTrackbar("Scale percentage", win_gest_trackbars, &scale_percentage_,
+  cv::namedWindow(w_gest_trackbars_);
+  cv::createTrackbar("Scale percentage", w_gest_trackbars_, &scale_percentage_,
                      100);
-  cv::createTrackbar("Min defect angle", win_gest_trackbars, &min_defect_angle_,
+  cv::createTrackbar("Min defect angle", w_gest_trackbars_, &min_defect_angle_,
                      270);
-  cv::createTrackbar("Max defect angle", win_gest_trackbars, &max_defect_angle_,
+  cv::createTrackbar("Max defect angle", w_gest_trackbars_, &max_defect_angle_,
                      270);
-
-  ok_image = cv::imread("res/ok1.jpg");
 }
+
 void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
   // CODIGO 3.1
@@ -30,64 +29,62 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   }
 
   int max_contour_index = -1;
-  std::vector<cv::Point> max_contour = contours[0];
+  max_contour_ = contours[0];
   for (size_t i = 1; i < contours.size(); ++i) {
-    if (contours[i].size() > max_contour.size()) {
-      max_contour = contours[i];
+    if (contours[i].size() > max_contour_.size()) {
+      max_contour_ = contours[i];
       max_contour_index = i;
     }
   }
 
-  if (debug_lines_) {
-    cv::drawContours(output_img, contours, max_contour_index,
-                     cv::Scalar(255, 0, 0), 2);
-  }
-
   // Obtenemos el convex hull
   std::vector<int> hull_ints; // Para calcular los defectos de convexidad
-  cv::convexHull(max_contour, hull_ints);
+  cv::convexHull(max_contour_, hull_ints);
 
   std::vector<cv::Point> hull_points; // Para dibujar y el bounding rect
-  cv::convexHull(max_contour, hull_points);
+  cv::convexHull(max_contour_, hull_points);
 
   // Calculamos el bounding rect (Para operaciones invariables a escala)
-  cv::Rect hand_rect = cv::boundingRect(hull_points);
-
+  hand_rect_ = cv::boundingRect(hull_points);
   // El centro del bounding rect lo guardamos para trackear el movimiento de la
   // mano
-  cv::Point hand_rect_center = cv::Point(hand_rect.x + hand_rect.width / 2,
-                                         hand_rect.y + hand_rect.height / 2);
+  cv::Point hand_rect_center = cv::Point(hand_rect_.x + hand_rect_.width / 2,
+                                         hand_rect_.y + hand_rect_.height / 2);
 
   hand_points_[hand_points_index_ % hand_points_.size()] = hand_rect_center;
   ++hand_points_index_;
 
-  // Pintamos el convex hull y el bounding rect
+  // Pintamos countour, convex hull y bounding rect
   if (debug_lines_) {
+    cv::drawContours(output_img, contours, max_contour_index, {255, 0, 0}, 2);
     cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
-    cv::rectangle(output_img, hand_rect, cv::Scalar(0, 255, 255), 2);
+    cv::rectangle(output_img, hand_rect_, cv::Scalar(0, 255, 255), 2);
   }
 
   // Obtenemos los defectos de convexidad
   std::vector<cv::Vec4i> defects;
-  cv::convexityDefects(max_contour, hull_ints, defects);
+  cv::convexityDefects(max_contour_, hull_ints, defects);
 
   // Detectamos las puntas de los dedos a partir de los defectos
   finger_tips_.clear();
   finger_count_ = 0;
 
-  std::vector<cv::Vec4i> filtered_defects;
+  // Guardamos los defectos filtrados para hacer cálculos con ellos
+  filtered_defects_.clear();
+
   for (const auto &defect : defects) {
-    if (finger_tips_.size() >= 5)
+    if (filtered_defects_.size() >= 5)
       break;
 
-    cv::Point s = max_contour[defect[0]];
-    cv::Point e = max_contour[defect[1]];
-    cv::Point f = max_contour[defect[2]];
+    cv::Point s = max_contour_[defect[0]];
+    cv::Point e = max_contour_[defect[1]];
+    cv::Point f = max_contour_[defect[2]];
 
     float defect_depth = float(defect[3]) / 256.0;
     double angle = getAngle(s, e, f);
 
-    if (defect_depth < hand_rect.height * float(scale_percentage_) / 100)
+    // Filtar según porcentaje del bounding rect
+    if (defect_depth < hand_rect_.height * float(scale_percentage_) / 100)
       continue;
 
     // Filtrar según el ángulo mínimo y máximo
@@ -97,66 +94,35 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
     if (debug_lines_)
       cv::circle(output_img, f, 3, cv::Scalar(0, 0, 255), 2);
 
-    filtered_defects.push_back(defect);
+    filtered_defects_.push_back(defect);
     finger_tips_.push_back(e);
+
+    cv::circle(output_img, s, 5, cv::Scalar(255, 255, 0), -1);
   }
 
-  finger_count_ = finger_tips_.size() + 1;
+  finger_count_ = filtered_defects_.size() + 1;
 
-  if (finger_tips_.size() == 0) {
-    int hand_rect_ratio = std::abs(hand_rect.width - hand_rect.height);
-    if (hand_rect_ratio < 80)
+  // Si no detecta ningún defecto y el bounding rect es más cuadrado, es un puño
+  // cerrado
+  if (filtered_defects_.size() == 0) {
+    int hand_ratio = std::abs(hand_rect_.width - hand_rect_.height);
+    if (hand_ratio < 80)
       finger_count_ = 0;
-  } else if (finger_tips_.size() == 1) {
-    if (hand_rect.width > hand_rect.height)
+
+    // Si solo detecta un defecto y es más ancho que largo, es el pulgar
+  } else if (filtered_defects_.size() == 1) {
+    if (hand_rect_.width > hand_rect_.height)
       finger_count_ = 1;
-  }
-  for (const auto &point : finger_tips_)
-    cv::circle(output_img, point, 5, cv::Scalar(255, 255, 0), -1);
-
-  message_ = "";
-
-  if (finger_count_ == 3) {
-    cv::Point s = max_contour[filtered_defects[1][0]];
-    cv::Point e = max_contour[filtered_defects[1][1]];
-
-    if (cv::norm(s - e) > hand_rect.width * 0.56)
-      message_ = "Rock!";
-  } else if (finger_count_ == 2) {
-    cv::Point s = max_contour[filtered_defects[0][0]];
-    cv::Point e = max_contour[filtered_defects[0][1]];
-    cv::Point f = max_contour[filtered_defects[0][2]];
-    double angle = getAngle(s, e, f);
-    std::cout << angle << std::endl;
-
-    if (angle > 90 && angle < 120)
-      message_ = "Loser!";
-    else if (angle > 20 && angle < 60)
-      message_ = "Peace!";
-
-  } else if (finger_count_ == 4) {
-    cv::Point s = max_contour[filtered_defects[0][0]];
-    cv::Point e = max_contour[filtered_defects[0][1]];
-    cv::Point f = max_contour[filtered_defects[0][2]];
-    double angle = getAngle(s, e, f);
-
-    cv::Point f2 = max_contour[filtered_defects[1][2]];
-    int dist_f1_f2 = cv::norm(f - f2);
-
-    if (angle > 50 && cv::abs(s.y - e.y) > hand_rect.height * 0.25 &&
-        dist_f1_f2 < hand_rect.height * 0.2) {
-      message_ = "OK";
-    }
   }
 }
 
 void HandGesture::FingerDrawing(cv::Mat &output_img) {
   // Dibujar zonas de pincel
-  cv::rectangle(output_img, red_rect, cv::Scalar(0, 0, 255), cv::FILLED);
-  cv::rectangle(output_img, green_rect, cv::Scalar(0, 255, 0), cv::FILLED);
-  cv::rectangle(output_img, blue_rect, cv::Scalar(255, 0, 0), cv::FILLED);
-  cv::rectangle(output_img, clear_rect, cv::Scalar(255, 255, 255), cv::FILLED);
-  cv::circle(output_img, cv::Point(580, 40), 30, drawing_color_, cv::FILLED);
+  cv::rectangle(output_img, red_rect, {0, 0, 255}, cv::FILLED);
+  cv::rectangle(output_img, green_rect, {0, 255, 0}, cv::FILLED);
+  cv::rectangle(output_img, blue_rect, {255, 0, 0}, cv::FILLED);
+  cv::rectangle(output_img, clear_rect, {255, 255, 255}, cv::FILLED);
+  cv::circle(output_img, {580, 40}, 30, drawing_color_, cv::FILLED);
 
   if (finger_count_ >= 2) {
 
@@ -195,6 +161,52 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
     cv::polylines(output_img, line_color.first, false, line_color.second, 2);
 }
 
+void HandGesture::DetectHandGestures() {
+  message_ = "";
+
+  if (finger_count_ >= 2) {
+    cv::Point s1 = max_contour_[filtered_defects_[0][0]];
+    cv::Point e1 = max_contour_[filtered_defects_[0][1]];
+    cv::Point f1 = max_contour_[filtered_defects_[0][2]];
+    double angle1 = getAngle(s1, e1, f1);
+
+    cv::Point s2 = max_contour_[filtered_defects_[1][0]];
+    cv::Point e2 = max_contour_[filtered_defects_[1][1]];
+    cv::Point f2 = max_contour_[filtered_defects_[1][2]];
+
+    // Gestos con 2 dedos:
+    if (finger_count_ == 2) {
+
+      if (angle1 > 90 && angle1 < 120)
+        message_ = "Loser!";
+      else if (angle1 > 20 && angle1 < 60)
+        message_ = "Peace!";
+    }
+
+    // Gestos con 3 dedos:
+    if (finger_count_ == 3) {
+
+      int index_pinky_dist = cv::norm(s2 - e2);
+
+      // Gestos con 3 dedos:
+      if (index_pinky_dist > hand_rect_.width * 0.56)
+        message_ = "Rock!";
+    }
+
+    // Gestos con 4 dedos:
+    if (finger_count_ == 4) {
+
+      int dist_f1_f2 = cv::norm(f1 - f2);
+      int vertical_dist = cv::abs(s1.y - e1.y);
+
+      if (angle1 > 50 && vertical_dist > hand_rect_.height * 0.25 &&
+          dist_f1_f2 < hand_rect_.height * 0.2) {
+        message_ = "OK";
+      }
+    }
+  }
+}
+
 void HandGesture::DetectHandMovement(cv::Mat &output_img) {
   for (size_t i = 0; i < hand_points_.size() - 1; ++i) {
     cv::line(output_img,
@@ -229,10 +241,12 @@ void HandGesture::DetectHandMovement(cv::Mat &output_img) {
     hand_direction_ += "Quieta";
 
   /* int start_end_diff = */
-  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() - 1].x);
+  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() -
+   * 1].x);
    */
   /* int start_mid_diff = */
-  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() / 2].x);
+  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() /
+   * 2].x);
    */
 
   /* if (start_end_diff < 40 && start_mid_diff < 150) */
