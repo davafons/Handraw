@@ -39,10 +39,10 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
   // Obtenemos el convex hull
   std::vector<int> hull_ints; // Para calcular los defectos de convexidad
-  cv::convexHull(max_contour_, hull_ints);
+  cv::convexHull(max_contour_, hull_ints, contour_oritentation_clockwise_);
 
   std::vector<cv::Point> hull_points; // Para dibujar y el bounding rect
-  cv::convexHull(max_contour_, hull_points);
+  cv::convexHull(max_contour_, hull_points, contour_oritentation_clockwise_);
 
   // Calculamos el bounding rect (Para operaciones invariables a escala)
   hand_rect_ = cv::boundingRect(hull_points);
@@ -65,10 +65,7 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   std::vector<cv::Vec4i> defects;
   cv::convexityDefects(max_contour_, hull_ints, defects);
 
-  // Detectamos las puntas de los dedos a partir de los defectos
-  finger_tips_.clear();
   finger_count_ = 0;
-
   // Guardamos los defectos filtrados para hacer cálculos con ellos
   filtered_defects_.clear();
 
@@ -95,7 +92,6 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
       cv::circle(output_img, f, 3, cv::Scalar(0, 0, 255), 2);
 
     filtered_defects_.push_back(defect);
-    finger_tips_.push_back(e);
 
     cv::circle(output_img, s, 5, cv::Scalar(255, 255, 0), -1);
   }
@@ -118,6 +114,14 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
 void HandGesture::FingerDrawing(cv::Mat &output_img) {
   // Dibujar zonas de pincel
+  cv::Rect red_rect{420, 380, 80, 80};
+  cv::Rect blue_rect{340, 380, 80, 80};
+  cv::Rect green_rect{260, 380, 80, 80};
+  cv::Rect clear_rect{0, 380, 80, 80};
+
+  if (colors_position_top_)
+    red_rect.y = blue_rect.y = green_rect.y = clear_rect.y = 0;
+
   cv::rectangle(output_img, red_rect, {0, 0, 255}, cv::FILLED);
   cv::rectangle(output_img, green_rect, {0, 255, 0}, cv::FILLED);
   cv::rectangle(output_img, blue_rect, {255, 0, 0}, cv::FILLED);
@@ -128,31 +132,29 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
 
     cv::Scalar new_color(0);
 
-    for (const auto &tip : finger_tips_) {
-      if (red_rect.contains(tip))
+    for (const auto &defect : filtered_defects_) {
+      if (red_rect.contains(max_contour_[defect[0]]))
         new_color += cv::Scalar(0, 0, 255);
-      if (green_rect.contains(tip))
+      if (green_rect.contains(max_contour_[defect[0]]))
         new_color += cv::Scalar(0, 255, 0);
-      if (blue_rect.contains(tip))
+      if (blue_rect.contains(max_contour_[defect[0]]))
         new_color += cv::Scalar(255, 0, 0);
-      if (clear_rect.contains(tip)) {
+      if (clear_rect.contains(max_contour_[defect[0]])) {
         drawn_lines_.clear();
         current_line_.clear();
       }
     }
 
-    if (new_color != cv::Scalar(0, 0, 0)) {
-      if (!current_line_.empty()) {
-        drawn_lines_.push_back(std::make_pair(current_line_, drawing_color_));
-        current_line_.clear();
-      }
-
+    if (new_color != cv::Scalar(0, 0, 0))
       drawing_color_ = new_color;
+
+    if (finger_count_ == 2)
+      current_line_.push_back(max_contour_[filtered_defects_[0][0]]);
+    else if (!current_line_.empty()) {
+      drawn_lines_.push_back(std::make_pair(current_line_, drawing_color_));
+      current_line_.clear();
     }
   }
-
-  if (finger_count_ == 1)
-    current_line_.push_back(cv::Point(finger_tips_.front()));
 
   // Draw lines
   cv::polylines(output_img, current_line_, false, drawing_color_, 2);
@@ -170,10 +172,6 @@ void HandGesture::DetectHandGestures() {
     cv::Point f1 = max_contour_[filtered_defects_[0][2]];
     double angle1 = getAngle(s1, e1, f1);
 
-    cv::Point s2 = max_contour_[filtered_defects_[1][0]];
-    cv::Point e2 = max_contour_[filtered_defects_[1][1]];
-    cv::Point f2 = max_contour_[filtered_defects_[1][2]];
-
     // Gestos con 2 dedos:
     if (finger_count_ == 2) {
 
@@ -183,25 +181,30 @@ void HandGesture::DetectHandGestures() {
         message_ = "Peace!";
     }
 
-    // Gestos con 3 dedos:
-    if (finger_count_ == 3) {
-
-      int index_pinky_dist = cv::norm(s2 - e2);
+    if (finger_count_ >= 3) {
+      cv::Point s2 = max_contour_[filtered_defects_[1][0]];
+      cv::Point e2 = max_contour_[filtered_defects_[1][1]];
+      cv::Point f2 = max_contour_[filtered_defects_[1][2]];
 
       // Gestos con 3 dedos:
-      if (index_pinky_dist > hand_rect_.width * 0.56)
-        message_ = "Rock!";
-    }
+      if (finger_count_ == 3) {
 
-    // Gestos con 4 dedos:
-    if (finger_count_ == 4) {
+        int index_pinky_dist = cv::norm(s2 - e2);
 
-      int dist_f1_f2 = cv::norm(f1 - f2);
-      int vertical_dist = cv::abs(s1.y - e1.y);
+        if (index_pinky_dist > hand_rect_.width * 0.56)
+          message_ = "Rock!";
+      }
 
-      if (angle1 > 50 && vertical_dist > hand_rect_.height * 0.25 &&
-          dist_f1_f2 < hand_rect_.height * 0.2) {
-        message_ = "OK";
+      // Gestos con 4 dedos:
+      if (finger_count_ == 4) {
+
+        int dist_f1_f2 = cv::norm(f1 - f2);
+        int vertical_dist = cv::abs(s1.y - e1.y);
+
+        if (angle1 > 50 && vertical_dist > hand_rect_.height * 0.25 &&
+            dist_f1_f2 < hand_rect_.height * 0.2) {
+          message_ = "OK";
+        }
       }
     }
   }
@@ -241,13 +244,12 @@ void HandGesture::DetectHandMovement(cv::Mat &output_img) {
     hand_direction_ += "Quieta";
 
   /* int start_end_diff = */
-  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() -
-   * 1].x);
-   */
+  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x - hand_points_[(hand_points_index_ - 1) % hand_points_.size()].x); */
   /* int start_mid_diff = */
-  /*     std::abs(hand_points_[0].x - hand_points_[hand_points_.size() /
-   * 2].x);
-   */
+  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x - hand_points_[(hand_points_index_ % hand_points_.size()) / 2].x); */
+
+  /* if(hand_points_index_ % hand_points_.size() == 0) */
+  /*   std::cout << "--" << std::endl; */
 
   /* if (start_end_diff < 40 && start_mid_diff < 150) */
   /*   message_ = "Hola!"; */

@@ -91,11 +91,11 @@ int main(int argc, char *argv[]) {
     // 7º - Detectar defectos de convexidad y dedos
     hand_detector.FeaturesDetection(bgmask, frame);
 
-    // 7Aº - Dibujar
+    /* // 7Aº - Dibujar */
     if (draw_enabled)
       hand_detector.FingerDrawing(frame);
 
-    // 7Bº - Detectar dirección de movimiento de la mano
+    /* // 7Bº - Detectar dirección de movimiento de la mano */
     hand_detector.DetectHandMovement(frame);
     hand_detector.DetectHandGestures();
 
@@ -173,6 +173,14 @@ void handle_input(int c) {
 
   case 'k': // Activar dibujar
     draw_enabled = !draw_enabled;
+    break;
+
+  case 'l': // Cambiar la posición de los colores para dibujar
+    hand_detector.ToggleColorsPosition();
+    break;
+
+  case 'c': // Crea el convex hull en el sentido de las agujas del reloj o no
+    hand_detector.ToggleContourOrientation();
     break;
   }
 }
