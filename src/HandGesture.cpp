@@ -69,6 +69,8 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   // Guardamos los defectos filtrados para hacer cálculos con ellos
   filtered_defects_.clear();
 
+  // CODIGO 3.2
+  // Filtrar y mostrar los defectos de convexidad
   for (const auto &defect : defects) {
     if (filtered_defects_.size() >= 5)
       break;

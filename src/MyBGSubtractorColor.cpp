@@ -134,14 +134,23 @@ void MyBGSubtractorColor::ObtainBGMask(const cv::Mat frame,
   cv::Mat hls_frame;
   cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
+  // No tiene que ver con la práctica. Es una operación de sustracción de fondo
+  // añadida para eliminar fondo estático (Se crea una máscara con los objetos
+  // que no estén en el fondo. Se ha implementado por no tener superficies lisas
+  // en casa donde enfocar la cámara)
   if (bg_sub_enabled_)
     RemoveBG(hls_frame, hls_frame);
+
+  // CODIGO 1.2
+  // Definir los rangos máximos y mínimos para cada canal (HLS)
+  // umbralizar las imágenes para cada rango y sumarlas para
+  // obtener la máscara final con el fondo eliminado
 
   cv::Mat acc = cv::Mat::zeros(frame.size(), CV_8U);
 
   for (const auto &mean : means_) {
     cv::Scalar low_bound(mean[0] - h_low_, mean[1] - s_low_, mean[2] - l_low_);
-    cv::Scalar up_bound(mean[0] + h_up_, mean[1] + s_up_, +mean[2] + l_up_);
+    cv::Scalar up_bound(mean[0] + h_up_, mean[1] + s_up_, mean[2] + l_up_);
 
     clamp(low_bound, 0, 255);
     clamp(up_bound, 0, 255);
