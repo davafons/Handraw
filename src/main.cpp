@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
     cv::putText(frame, hand_detector.getHandDirection(), {410, 460},
                 cv::FONT_HERSHEY_SIMPLEX, 1, {0, 0, 255}, 2);
     cv::putText(frame, hand_detector.getMessage(), {430, 410},
-                cv::FONT_HERSHEY_SIMPLEX, 1, {0, 255, 255}, 2);
+                cv::FONT_HERSHEY_SIMPLEX, 4, {0, 255, 255}, 2);
 
     cv::imshow(reconocimiento, frame);
     cv::flip(bgmask, bgmask, 1);

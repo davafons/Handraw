@@ -166,7 +166,7 @@ void MyBGSubtractorColor::RemoveBG(const cv::Mat frame,
   cv::bitwise_and(frame, frame, result, foreground_mask);
   masked_frame = result;
 
-  cv::imshow(w_bg_sub_, masked_frame);
+  /* cv::imshow(w_bg_sub_, masked_frame); */
 }
 
 void MyBGSubtractorColor::clamp(cv::Scalar &s, int low, int up) const {

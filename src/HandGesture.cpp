@@ -13,6 +13,8 @@ HandGesture::HandGesture() {
                      270);
   cv::createTrackbar("Max defect angle", w_gest_trackbars_, &max_defect_angle_,
                      270);
+
+  ok_image = cv::imread("res/ok1.jpg");
 }
 
 void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
@@ -204,10 +206,16 @@ void HandGesture::DetectHandGestures() {
         if (angle1 > 50 && vertical_dist > hand_rect_.height * 0.25 &&
             dist_f1_f2 < hand_rect_.height * 0.2) {
           message_ = "OK";
+          if(alpha < 1.0f)
+            alpha += 0.04f;
         }
       }
     }
   }
+
+  cv::Mat dst;
+  cv::addWeighted(ok_image, alpha, ok_image, 0, 0.0f, dst);
+  cv::imshow("BG Sub", dst);
 }
 
 void HandGesture::DetectHandMovement(cv::Mat &output_img) {
@@ -244,9 +252,11 @@ void HandGesture::DetectHandMovement(cv::Mat &output_img) {
     hand_direction_ += "Quieta";
 
   /* int start_end_diff = */
-  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x - hand_points_[(hand_points_index_ - 1) % hand_points_.size()].x); */
+  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x -
+   * hand_points_[(hand_points_index_ - 1) % hand_points_.size()].x); */
   /* int start_mid_diff = */
-  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x - hand_points_[(hand_points_index_ % hand_points_.size()) / 2].x); */
+  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x -
+   * hand_points_[(hand_points_index_ % hand_points_.size()) / 2].x); */
 
   /* if(hand_points_index_ % hand_points_.size() == 0) */
   /*   std::cout << "--" << std::endl; */

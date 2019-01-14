@@ -15,6 +15,7 @@ public:
   void ToggleDebugLines() { debug_lines_ = !debug_lines_; };
   void ToggleContourOrientation() {
     contour_oritentation_clockwise_ = !contour_oritentation_clockwise_;
+    alpha = 0.0f;
   }
   void ToggleColorsPosition() {
     colors_position_top_ = !colors_position_top_;
@@ -29,6 +30,8 @@ private:
   int scale_percentage_{25};
   int min_defect_angle_{15};
   int max_defect_angle_{120};
+
+  float alpha{0.0f};
 
   bool contour_oritentation_clockwise_{true};
 
@@ -53,6 +56,8 @@ private:
   int hand_points_index_{0};
   std::string hand_direction_{""};
   std::string message_{""};
+
+  cv::Mat ok_image;
 
   // Window
   const std::string w_gest_trackbars_{"Gesture Trackbacks"};
