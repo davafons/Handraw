@@ -19,8 +19,8 @@ const int MAX_EMPTY_FRAMES_TO_READ = 2000;
 bool quit = false;
 bool draw_enabled = false;
 
-int dilation_size = 2;
-int median_size = 9;
+int dilation_size = 1;
+int median_size = 11;
 cv::Mat element = cv::getStructuringElement(
     cv::MORPH_ELLIPSE, {2 * dilation_size + 1, 2 * dilation_size + 1});
 
@@ -84,9 +84,9 @@ int main(int argc, char *argv[]) {
     bg_sub.ObtainBGMask(frame, bgmask);
 
     // 6º - Reducir el ruido de la máscara binaria
-    cv::medianBlur(bgmask, bgmask, median_size);
     cv::morphologyEx(bgmask, bgmask, cv::MORPH_OPEN, element);
     cv::dilate(bgmask, bgmask, element);
+    cv::medianBlur(bgmask, bgmask, median_size);
 
     // 7º - Detectar defectos de convexidad y dedos
     hand_detector.FeaturesDetection(bgmask, frame);
@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
 }
 
 void open_camera(cv::VideoCapture &cap) {
-  if (!cap.open(0))
+  if (!cap.open(1))
     throw std::runtime_error("No se pudo abrir la cámara!");
 
   cv::Mat frame;

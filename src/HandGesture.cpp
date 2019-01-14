@@ -46,11 +46,11 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
   // Calculamos el bounding rect (Para operaciones invariables a escala)
   hand_rect_ = cv::boundingRect(hull_points);
+
   // El centro del bounding rect lo guardamos para trackear el movimiento de la
   // mano
   cv::Point hand_rect_center = cv::Point(hand_rect_.x + hand_rect_.width / 2,
                                          hand_rect_.y + hand_rect_.height / 2);
-
   hand_points_.push_back(hand_rect_center);
   hand_points_.pop_front();
 
@@ -65,14 +65,14 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   std::vector<cv::Vec4i> defects;
   cv::convexityDefects(max_contour_, hull_ints, defects);
 
-  finger_count_ = 0;
   // Guardamos los defectos filtrados para hacer cálculos con ellos
   filtered_defects_.clear();
+  finger_count_ = 0;
 
   // CODIGO 3.2
   // Filtrar y mostrar los defectos de convexidad
   for (const auto &defect : defects) {
-    if (filtered_defects_.size() >= 5)
+    if (filtered_defects_.size() >= 4)
       break;
 
     cv::Point s = max_contour_[defect[0]];
@@ -119,7 +119,7 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
   cv::Rect red_rect{420, 380, 80, 80};
   cv::Rect blue_rect{340, 380, 80, 80};
   cv::Rect green_rect{260, 380, 80, 80};
-  cv::Rect clear_rect{0, 380, 80, 80};
+  cv::Rect clear_rect{100, 380, 80, 80};
 
   if (colors_position_top_)
     red_rect.y = blue_rect.y = green_rect.y = clear_rect.y = 0;
@@ -150,7 +150,7 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
     if (new_color != cv::Scalar(0, 0, 0))
       drawing_color_ = new_color;
 
-    if (finger_count_ == 2)
+    if (finger_count_ == 2 || finger_count_ == 3)
       current_line_.push_back(max_contour_[filtered_defects_[0][0]]);
     else if (!current_line_.empty()) {
       drawn_lines_.push_back(std::make_pair(current_line_, drawing_color_));
@@ -210,6 +210,22 @@ void HandGesture::DetectHandGestures() {
       }
     }
   }
+
+  // Detectar gestos por movimiento
+  int hand_changes = 0;
+  std::string last_direction = hand_directions_.front();
+  for (const auto &dir : hand_directions_) {
+    if (dir != last_direction && dir != "Quieta") {
+      last_direction = dir;
+      ++hand_changes;
+    }
+
+    if (dir == "Arriba" || dir == "Abajo")
+      hand_changes = 0;
+  }
+
+  if (hand_changes >= 4)
+    message_ = "HOLA!";
 }
 
 void HandGesture::DetectHandMovement(cv::Mat &output_img) {
@@ -241,20 +257,8 @@ void HandGesture::DetectHandMovement(cv::Mat &output_img) {
   if (hand_direction_.empty())
     hand_direction_ += "Quieta";
 
-  /* int start_end_diff = */
-  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x - hand_points_[(hand_points_index_ - 1) % hand_points_.size()].x); */
-  /* int start_mid_diff = */
-  /*     std::abs(hand_points_[hand_points_index_ % hand_points_.size()].x - hand_points_[(hand_points_index_ % hand_points_.size()) / 2].x); */
-
-  /* if(hand_points_index_ % hand_points_.size() == 0) */
-  /*   std::cout << "--" << std::endl; */
-
-  /* if (start_end_diff < 40 && start_mid_diff < 150) */
-  /*   message_ = "Hola!"; */
-  /* else */
-  /*   message_ = ""; */
-
-  /* std::cout << start_end_diff << " - " << start_mid_diff << std::endl; */
+  hand_directions_.push_back(hand_direction_);
+  hand_directions_.pop_front();
 }
 
 double HandGesture::getAngle(cv::Point s, cv::Point e, cv::Point f) {

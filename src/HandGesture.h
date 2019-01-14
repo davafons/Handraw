@@ -51,6 +51,7 @@ private:
 
   // Motion detection
   std::deque<cv::Point> hand_points_{10, cv::Point(0)};
+  std::deque<std::string> hand_directions_{10, ""};
   std::string hand_direction_{""};
   std::string message_{""};
 
