@@ -51,8 +51,8 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   cv::Point hand_rect_center = cv::Point(hand_rect_.x + hand_rect_.width / 2,
                                          hand_rect_.y + hand_rect_.height / 2);
 
-  hand_points_[hand_points_index_ % hand_points_.size()] = hand_rect_center;
-  ++hand_points_index_;
+  hand_points_.push_back(hand_rect_center);
+  hand_points_.pop_front();
 
   // Pintamos countour, convex hull y bounding rect
   if (debug_lines_) {
@@ -175,7 +175,7 @@ void HandGesture::DetectHandGestures() {
     // Gestos con 2 dedos:
     if (finger_count_ == 2) {
 
-      if (angle1 > 90 && angle1 < 120)
+      if (angle1 > 80 && angle1 < 120)
         message_ = "Loser!";
       else if (angle1 > 20 && angle1 < 60)
         message_ = "Peace!";
@@ -212,19 +212,15 @@ void HandGesture::DetectHandGestures() {
 
 void HandGesture::DetectHandMovement(cv::Mat &output_img) {
   for (size_t i = 0; i < hand_points_.size() - 1; ++i) {
-    cv::line(output_img,
-             hand_points_[(i + hand_points_index_) % hand_points_.size()],
-             hand_points_[(i + hand_points_index_ + 1) % hand_points_.size()],
+    cv::line(output_img, hand_points_[i], hand_points_[i + 1],
              cv::Scalar(0, 0, 255),
              11 - (10.0f / hand_points_.size()) * (hand_points_.size() - i));
   }
 
   hand_direction_.clear();
 
-  int dX = hand_points_[hand_points_index_ % hand_points_.size()].x -
-           hand_points_[(hand_points_index_ - 1) % hand_points_.size()].x;
-  int dY = hand_points_[hand_points_index_ % hand_points_.size()].y -
-           hand_points_[(hand_points_index_ - 1) % hand_points_.size()].y;
+  int dX = hand_points_.front().x - hand_points_.back().x;
+  int dY = hand_points_.front().y - hand_points_.back().y;
 
   if (std::abs(dX) > 40) {
     if (dX > 0)

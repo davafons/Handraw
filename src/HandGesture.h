@@ -1,6 +1,7 @@
 #pragma once
 
-#include <queue>
+#include <vector>
+#include <deque>
 #include <string>
 
 #include <opencv2/opencv.hpp>
@@ -49,8 +50,7 @@ private:
   std::vector<std::pair<std::vector<cv::Point>, cv::Scalar>> drawn_lines_;
 
   // Motion detection
-  std::vector<cv::Point> hand_points_{10, cv::Point(0)};
-  int hand_points_index_{0};
+  std::deque<cv::Point> hand_points_{10, cv::Point(0)};
   std::string hand_direction_{""};
   std::string message_{""};
 
