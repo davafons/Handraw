@@ -22,7 +22,7 @@ public:
   }
 
   int getFingerCount() const { return finger_count_; }
-  std::string getHandDirection() const { return hand_direction_; }
+  std::string getHandDirection() const { return hand_directions_.back(); }
   std::string getMessage() const { return message_; }
 
 private:
@@ -52,7 +52,6 @@ private:
   // Motion detection
   std::deque<cv::Point> hand_points_{10, cv::Point(0)};
   std::deque<std::string> hand_directions_{10, ""};
-  std::string hand_direction_{""};
   std::string message_{""};
 
   // Window

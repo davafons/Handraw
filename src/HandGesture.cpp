@@ -57,7 +57,6 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   // Pintamos countour, convex hull y bounding rect
   if (debug_lines_) {
     cv::drawContours(output_img, contours, max_contour_index, {255, 0, 0}, 2);
-    cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
     cv::rectangle(output_img, hand_rect_, cv::Scalar(0, 255, 255), 2);
   }
 
@@ -95,7 +94,7 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 
     filtered_defects_.push_back(defect);
 
-    cv::circle(output_img, s, 5, cv::Scalar(255, 255, 0), -1);
+    /* cv::circle(output_img, s, 5, cv::Scalar(255, 255, 0), -1); */
   }
 
   finger_count_ = filtered_defects_.size() + 1;
@@ -115,7 +114,7 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
 }
 
 void HandGesture::FingerDrawing(cv::Mat &output_img) {
-  // Dibujar zonas de pincel
+  // Dibujar rectángulos que hagan de paleta de colores
   cv::Rect red_rect{420, 380, 80, 80};
   cv::Rect blue_rect{340, 380, 80, 80};
   cv::Rect green_rect{260, 380, 80, 80};
@@ -150,8 +149,11 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
     if (new_color != cv::Scalar(0, 0, 0))
       drawing_color_ = new_color;
 
+    //  Dibuja cuando se detecten 2 o 3 dedos
     if (finger_count_ == 2 || finger_count_ == 3)
       current_line_.push_back(max_contour_[filtered_defects_[0][0]]);
+
+    // Si no, se guarda la línea en el vector de líneas dibujadas
     else if (!current_line_.empty()) {
       drawn_lines_.push_back(std::make_pair(current_line_, drawing_color_));
       current_line_.clear();
@@ -211,7 +213,7 @@ void HandGesture::DetectHandGestures() {
     }
   }
 
-  // Detectar gestos por movimiento
+  // Detectar gestos dinámicos
   int hand_changes = 0;
   std::string last_direction = hand_directions_.front();
   for (const auto &dir : hand_directions_) {
@@ -229,35 +231,37 @@ void HandGesture::DetectHandGestures() {
 }
 
 void HandGesture::DetectHandMovement(cv::Mat &output_img) {
-  for (size_t i = 0; i < hand_points_.size() - 1; ++i) {
-    cv::line(output_img, hand_points_[i], hand_points_[i + 1],
-             cv::Scalar(0, 0, 255),
-             11 - (10.0f / hand_points_.size()) * (hand_points_.size() - i));
+  if (debug_lines_) {
+    for (size_t i = 0; i < hand_points_.size() - 1; ++i) {
+      cv::line(output_img, hand_points_[i], hand_points_[i + 1],
+               cv::Scalar(0, 0, 255),
+               11 - (10.0f / hand_points_.size()) * (hand_points_.size() - i));
+    }
   }
 
-  hand_direction_.clear();
+  std::string hand_direction;
 
   int dX = hand_points_.front().x - hand_points_.back().x;
   int dY = hand_points_.front().y - hand_points_.back().y;
 
   if (std::abs(dX) > 40) {
     if (dX > 0)
-      hand_direction_ += "Derecha";
+      hand_direction += "Derecha";
     else
-      hand_direction_ += "Izquierda";
+      hand_direction += "Izquierda";
   }
 
   if (std::abs(dY) > 40) {
     if (dY > 0)
-      hand_direction_ += "Arriba";
+      hand_direction += "Arriba";
     else
-      hand_direction_ += "Abajo";
+      hand_direction += "Abajo";
   }
 
-  if (hand_direction_.empty())
-    hand_direction_ += "Quieta";
+  if (hand_direction.empty())
+    hand_direction += "Quieta";
 
-  hand_directions_.push_back(hand_direction_);
+  hand_directions_.push_back(hand_direction);
   hand_directions_.pop_front();
 }
 

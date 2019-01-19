@@ -8,7 +8,7 @@
 #include "MyBGSubtractorColor.h"
 
 // Functions declaration
-void open_camera(cv::VideoCapture &cap);
+void open_camera(cv::VideoCapture &cap, unsigned int index);
 void correct_median_size(int, void *);
 void update_structuring_element(int, void *);
 void handle_input(int c);
@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
 
   // 1º - Abrir cámara
   try {
-    open_camera(cap);
+    open_camera(cap, 0);
   } catch (const std::runtime_error &e) {
     std::cerr << "ERROR::" << e.what() << std::endl;
     return EXIT_FAILURE;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
     cv::putText(frame, hand_detector.getHandDirection(), {410, 460},
                 cv::FONT_HERSHEY_SIMPLEX, 1, {0, 0, 255}, 2);
     cv::putText(frame, hand_detector.getMessage(), {430, 410},
-                cv::FONT_HERSHEY_SIMPLEX, 1, {0, 255, 255}, 2);
+                cv::FONT_HERSHEY_SIMPLEX, 2, {0, 0, 0}, 3);
 
     cv::imshow(reconocimiento, frame);
     cv::flip(bgmask, bgmask, 1);
@@ -123,8 +123,8 @@ int main(int argc, char *argv[]) {
   return EXIT_SUCCESS;
 }
 
-void open_camera(cv::VideoCapture &cap) {
-  if (!cap.open(1))
+void open_camera(cv::VideoCapture &cap, unsigned int index) {
+  if (!cap.open(index))
     throw std::runtime_error("No se pudo abrir la cámara!");
 
   cv::Mat frame;
