@@ -38,24 +38,24 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   }
 
   // Obtenemos el convex hull
-  std::vector<int> hull_ints; // Para calcular los defectos de convexidad
+  std::vector<int> hull_ints; // Para sacar los defectos de convexidad
   cv::convexHull(max_contour_, hull_ints, contour_oritentation_clockwise_);
 
-  std::vector<cv::Point> hull_points; // Para dibujar y el bounding rect
+  std::vector<cv::Point> hull_points; // Para dibujarlo y sacar el bounding rect
   cv::convexHull(max_contour_, hull_points, contour_oritentation_clockwise_);
 
   // Calculamos el bounding rect (Para operaciones invariables a escala)
   hand_rect_ = cv::boundingRect(hull_points);
 
-  // El centro del bounding rect lo guardamos para trackear el movimiento de la
-  // mano
+  // Actualizar la cola de posiciones del centro la mano
   cv::Point hand_rect_center = cv::Point(hand_rect_.x + hand_rect_.width / 2,
                                          hand_rect_.y + hand_rect_.height / 2);
   hand_points_.push_back(hand_rect_center);
   hand_points_.pop_front();
 
-  // Pintamos countour, convex hull y bounding rect
+  // Pintamos el countour, convex hull y bounding rect
   if (debug_lines_) {
+    cv::polylines(output_img, hull_points, true, cv::Scalar(0, 0, 255), 2);
     cv::drawContours(output_img, contours, max_contour_index, {255, 0, 0}, 2);
     cv::rectangle(output_img, hand_rect_, cv::Scalar(0, 255, 255), 2);
   }
@@ -64,14 +64,13 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
   std::vector<cv::Vec4i> defects;
   cv::convexityDefects(max_contour_, hull_ints, defects);
 
-  // Guardamos los defectos filtrados para hacer cálculos con ellos
+  // CODIGO 3.2
+  // Filtrar y mostrar los defectos de convexidad
   filtered_defects_.clear();
   finger_count_ = 0;
 
-  // CODIGO 3.2
-  // Filtrar y mostrar los defectos de convexidad
   for (const auto &defect : defects) {
-    if (filtered_defects_.size() >= 4)
+    if (filtered_defects_.size() >= 4) // No puede haber más de 4 uniones de los dedos
       break;
 
     cv::Point s = max_contour_[defect[0]];
@@ -92,9 +91,9 @@ void HandGesture::FeaturesDetection(const cv::Mat &mask, cv::Mat &output_img) {
     if (debug_lines_)
       cv::circle(output_img, f, 3, cv::Scalar(0, 0, 255), 2);
 
-    filtered_defects_.push_back(defect);
+    cv::circle(output_img, s, 5, cv::Scalar(255, 255, 0), -1);
 
-    /* cv::circle(output_img, s, 5, cv::Scalar(255, 255, 0), -1); */
+    filtered_defects_.push_back(defect);
   }
 
   finger_count_ = filtered_defects_.size() + 1;
@@ -120,7 +119,7 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
   cv::Rect green_rect{260, 380, 80, 80};
   cv::Rect clear_rect{100, 380, 80, 80};
 
-  if (colors_position_top_)
+  if (colors_position_top_) // Mueve la interfaz de arriba a abajo
     red_rect.y = blue_rect.y = green_rect.y = clear_rect.y = 0;
 
   cv::rectangle(output_img, red_rect, {0, 0, 255}, cv::FILLED);
@@ -133,6 +132,7 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
 
     cv::Scalar new_color(0);
 
+    // Por cada defecto comprueba si hay algun dedo dentro de un rectángulo
     for (const auto &defect : filtered_defects_) {
       if (red_rect.contains(max_contour_[defect[0]]))
         new_color += cv::Scalar(0, 0, 255);
@@ -149,8 +149,8 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
     if (new_color != cv::Scalar(0, 0, 0))
       drawing_color_ = new_color;
 
-    //  Dibuja cuando se detecten 2 o 3 dedos
-    if (finger_count_ == 2 || finger_count_ == 3)
+    //  Dibuja cuando se detecten 2 dedos
+    if (finger_count_ == 2)
       current_line_.push_back(max_contour_[filtered_defects_[0][0]]);
 
     // Si no, se guarda la línea en el vector de líneas dibujadas
@@ -160,9 +160,10 @@ void HandGesture::FingerDrawing(cv::Mat &output_img) {
     }
   }
 
-  // Draw lines
+  // Dibujar la línea actual
   cv::polylines(output_img, current_line_, false, drawing_color_, 2);
 
+  // Dibujar las anteriores líneas
   for (const auto &line_color : drawn_lines_)
     cv::polylines(output_img, line_color.first, false, line_color.second, 2);
 }
@@ -222,6 +223,7 @@ void HandGesture::DetectHandGestures() {
       ++hand_changes;
     }
 
+    // Resetear la cuenta si se mueve la mano arriba o abajo
     if (dir == "Arriba" || dir == "Abajo")
       hand_changes = 0;
   }

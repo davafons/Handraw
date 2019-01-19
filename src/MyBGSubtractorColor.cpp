@@ -34,6 +34,7 @@ void MyBGSubtractorColor::LearnModel(cv::VideoCapture &cap) {
   cv::createTrackbar("Max horiz samples", w_samples, &max_horiz_samples_, 10);
   cv::createTrackbar("Max vert samples", w_samples, &max_vert_samples_, 10);
 
+  // Posiciones de los rectángulos de las ROI
   std::vector<cv::Point> sample_rect_positions;
 
   cv::Mat frame;
@@ -85,7 +86,6 @@ void MyBGSubtractorColor::LearnModel(cv::VideoCapture &cap) {
     cv::Mat roi =
         hls_frame(cv::Rect{sample.x, sample.y, sample_size_, sample_size_});
     means_.push_back(cv::mean(roi));
-    std::cout << cv::mean(roi) << std::endl;
   }
 }
 
@@ -99,8 +99,6 @@ void MyBGSubtractorColor::LearnModel(std::istream &means_file) {
 
     means_.push_back(mean);
   }
-
-  std::cout << means_.size() << std::endl;
 }
 
 void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) const {
@@ -110,9 +108,10 @@ void MyBGSubtractorColor::LearnBGModel(cv::VideoCapture &cap) const {
   while (frame.empty())
     cap >> frame;
 
-  // Borrar el último fondo guardado
   cv::Mat hls_frame;
   cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
+
+  // El parámetro 1 de apply es para eliminar el último modelo de fondo
   bg_sub_->apply(hls_frame, temp, 1);
 
   // Generar un fondo nuevo mezclando tantas imágenes como bg_samples
@@ -134,10 +133,18 @@ void MyBGSubtractorColor::ObtainBGMask(const cv::Mat frame,
   cv::Mat hls_frame;
   cv::cvtColor(frame, hls_frame, cv::COLOR_BGR2HLS);
 
-  // No tiene que ver con la práctica. Es una operación de sustracción de fondo
-  // añadida para eliminar fondo estático (Se crea una máscara con los objetos
-  // que no estén en el fondo. Se ha implementado por no tener superficies lisas
-  // en casa donde enfocar la cámara)
+  // No tiene que ver con la práctica, es una operación de sustracción de fondo.
+  // Primero, la función LearnBGModel crea una imágen estática del fondo, y esta
+  // función compara esa imagen con el frame de la cámara. Los elementos de la
+  // cámara que no estén en el fondo se marcan como blanco, y el resto como
+  // negro. Finalmente, se hace un AND entre la máscara binaria y la imágen de
+  // la cámara para eliminar el fondo (Las ventanas BG y BG Sub muestran la
+  // imágen de fondo y la imagen de la máscara después de la sustracción de
+  // fondo respectivamente). Funciona muy bien para eliminar el fondo cuando no
+  // sea una pared lisa y hayan bastantes objetos que puedan compartir el mismo
+  // color que la mano.
+  // Para más información, está muy bien explicado en la documentación de OpenCV
+  // (https://docs.opencv.org/4.0.1/d1/dc5/tutorial_background_subtraction.html)
   if (bg_sub_enabled_)
     RemoveBG(hls_frame, hls_frame);
 

@@ -7,13 +7,15 @@
 #include "HandGesture.h"
 #include "MyBGSubtractorColor.h"
 
-// Functions declaration
 void open_camera(cv::VideoCapture &cap, unsigned int index);
+
 void correct_median_size(int, void *);
 void update_structuring_element(int, void *);
-void handle_input(int c);
 
-// Global variables
+void handle_input(int c);
+void show_help_message();
+
+// -- Global variables --
 const int MAX_EMPTY_FRAMES_TO_READ = 2000;
 
 bool quit = false;
@@ -29,6 +31,7 @@ MyBGSubtractorColor bg_sub;
 HandGesture hand_detector;
 
 int main(int argc, char *argv[]) {
+  show_help_message();
 
   // 1º - Abrir cámara
   try {
@@ -91,11 +94,11 @@ int main(int argc, char *argv[]) {
     // 7º - Detectar defectos de convexidad y dedos
     hand_detector.FeaturesDetection(bgmask, frame);
 
-    /* // 7Aº - Dibujar */
+    // 7Aº - Dibujar
     if (draw_enabled)
       hand_detector.FingerDrawing(frame);
 
-    /* // 7Bº - Detectar dirección de movimiento de la mano */
+    // 7Bº - Detectar dirección de movimiento de la mano
     hand_detector.DetectHandMovement(frame);
     hand_detector.DetectHandGestures();
 
@@ -175,7 +178,7 @@ void handle_input(int c) {
     draw_enabled = !draw_enabled;
     break;
 
-  case 'l': // Cambiar la posición de los colores para dibujar
+  case 'l': // Cambiar la posición de la interfaz de dibujo
     hand_detector.ToggleColorsPosition();
     break;
 
@@ -183,4 +186,16 @@ void handle_input(int c) {
     hand_detector.ToggleContourOrientation();
     break;
   }
+}
+
+void show_help_message() {
+  std::cout << "Teclas utilizadas:" << std::endl;
+  std::cout << "\t- [q] [Escape]   --> Salir de la aplicación" << std::endl;
+  std::cout << "\t- [r]\t\t --> Reaprender modelo de la mano" << std::endl;
+  std::cout << "\t- [b]\t\t --> Reaprender modelo de fondo" << std::endl;
+  std::cout << "\t- [r]\t\t --> Activar/Desactivar BG Sub MOG2" << std::endl;
+  std::cout << "\t- [d]\t\t --> Mostrar líneas de contorno, bounding rect, convex hull..." << std::endl;
+  std::cout << "\t- [k]\t\t --> Activar/Desactivar interfaz para dibujar" << std::endl;
+  std::cout << "\t- [l]\t\t --> Cambiar la posición de la interfaz de dibujo" << std::endl;
+  std::cout << "\t- [c]\t\t --> Cambia el sentido en el que se guardan los puntos del convex hull (clockwise / counterclockwise) [DEFAULT: clockwise]" << std::endl;
 }

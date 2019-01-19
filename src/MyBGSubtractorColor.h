@@ -11,14 +11,15 @@ public:
   MyBGSubtractorColor();
   ~MyBGSubtractorColor();
 
-  // Skin Model
+  // Generar modelo de la mano
   void LearnModel(cv::VideoCapture &cap);    // Desde la camara
   void LearnModel(std::istream &means_file); // Desde un archivo
 
-  // BG Subtraction
-  void LearnBGModel(cv::VideoCapture &cap) const;
+  // Crear máscara binaria
   void ObtainBGMask(const cv::Mat frame, cv::Mat &bgmask) const;
 
+  // BG Sub
+  void LearnBGModel(cv::VideoCapture &cap) const;
   void ToggleBGSubtractor() { bg_sub_enabled_ = !bg_sub_enabled_; }
 
 private:
@@ -28,13 +29,13 @@ private:
   int s_low_{18}, s_up_{70};
   std::vector<cv::Scalar> means_;
 
-  // Propiedades de los Rect utilizados para calcular los ROI de la piel
+  // Atributos de los Rect utilizados para calcular las ROI de la piel
   int max_horiz_samples_{3};
   int max_vert_samples_{6};
   int distance_between_samples_{30};
   int sample_size_{20};
 
-  // Objeto encargado de realizar la subtracción de fondo
+  // Clase para realizar BG Sub
   cv::Ptr<cv::BackgroundSubtractorMOG2> bg_sub_;
   int bg_samples_{20};
   bool bg_sub_enabled_{true};
