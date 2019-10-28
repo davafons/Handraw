@@ -12,3 +12,6 @@ cmake .
 make
 ./bin/Handraw
 ```
+
+## Informe de la práctica (Documentation and examples)
+[Link to the pdf](https://github.com/davafons/Handraw/blob/master/Informe%20Pr%C3%A1ctica%20Reconocimiento%20Gestos.pdf)
